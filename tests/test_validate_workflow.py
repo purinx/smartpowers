@@ -8,6 +8,8 @@ from pathlib import Path
 
 SCRIPT = (
     Path(__file__).parents[1]
+    / "plugins"
+    / "smartpowers"
     / "skills"
     / "smartpowers"
     / "scripts"

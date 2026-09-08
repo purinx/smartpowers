@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "smartpowers",
+  "owner": {
+    "name": "Yutaro Kijima"
+  },
+  "description": "Lightweight, review-gated development workflows for experienced engineers.",
+  "plugins": [
+    {
+      "name": "smartpowers",
+      "source": "./plugins/smartpowers",
+      "description": "Take a product idea through requirements, design, implementation planning, and delivery.",
+      "author": {
+        "name": "Yutaro Kijima"
+      },
+      "license": "MIT",
+      "category": "Development",
+      "tags": [
+        "prd",
+        "software-design",
+        "implementation-planning"
+      ]
+    }
+  ]
+}

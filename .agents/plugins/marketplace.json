@@ -1,0 +1,20 @@
+{
+  "name": "smartpowers",
+  "interface": {
+    "displayName": "Smartpowers"
+  },
+  "plugins": [
+    {
+      "name": "smartpowers",
+      "source": {
+        "source": "local",
+        "path": "./plugins/smartpowers"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Smartpowers
 
-Smartpowers is a lightweight development-workflow plugin for Codex and Claude Code. It takes a product idea through four explicit stages:
+Smartpowers is a lightweight development-workflow plugin and marketplace for Codex and Claude Code. It takes a product idea through four explicit stages:
 
 1. requirements in `docs/PRD.md`;
 2. first-build design in `docs/design_docs/FIRST_BUILD.md`;
@@ -12,31 +12,105 @@ PRD, design, and task-plan transitions require explicit user approval. Stable `R
 ## Repository layout
 
 ```text
-.codex-plugin/plugin.json       Codex manifest
-.claude-plugin/plugin.json      Claude Code manifest
-skills/smartpowers/SKILL.md     shared workflow
-skills/smartpowers/references/  phase-specific guides and templates
-skills/smartpowers/scripts/     artifact validator
+.agents/plugins/marketplace.json                  Codex marketplace
+.claude-plugin/marketplace.json                   Claude Code marketplace
+plugins/smartpowers/.codex-plugin/plugin.json     Codex plugin manifest
+plugins/smartpowers/.claude-plugin/plugin.json    Claude Code plugin manifest
+plugins/smartpowers/skills/smartpowers/SKILL.md   shared workflow
 ```
 
-## Try with Claude Code
+Both marketplaces expose the plugin as `smartpowers@smartpowers`.
 
-From the parent directory:
+## Install from GitHub
+
+Codex:
 
 ```bash
-claude --plugin-dir ./smartpowers
+codex plugin marketplace add purinx/smartpowers
+codex plugin add smartpowers@smartpowers
+```
+
+Claude Code:
+
+```bash
+claude plugin marketplace add purinx/smartpowers
+claude plugin install smartpowers@smartpowers
+```
+
+Start a new Codex or Claude Code session after installation. Invoke the workflow with:
+
+```text
+# Codex
+$smartpowers Build ...
+
+# Claude Code
+/smartpowers:smartpowers Build ...
+```
+
+## Update
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade smartpowers
+codex plugin add smartpowers@smartpowers
+```
+
+Claude Code:
+
+```bash
+claude plugin marketplace update smartpowers
+claude plugin update smartpowers@smartpowers
+```
+
+Start a new session after updating. In an existing Claude Code session, `/reload-plugins` can activate the updated plugin.
+
+## Uninstall
+
+Codex:
+
+```bash
+codex plugin remove smartpowers@smartpowers
+codex plugin marketplace remove smartpowers
+```
+
+Claude Code:
+
+```bash
+claude plugin uninstall smartpowers@smartpowers
+claude plugin marketplace remove smartpowers
+```
+
+## Install from a local checkout
+
+Clone the repository, then register its absolute path:
+
+```bash
+git clone https://github.com/purinx/smartpowers.git
+cd smartpowers
+
+codex plugin marketplace add "$PWD"
+codex plugin add smartpowers@smartpowers
+
+claude plugin marketplace add "$PWD"
+claude plugin install smartpowers@smartpowers
+```
+
+## Develop with Claude Code
+
+From the repository root:
+
+```bash
+claude --plugin-dir ./plugins/smartpowers
 ```
 
 Then run `/smartpowers:smartpowers` with a product idea. During development, `/reload-plugins` reloads changes.
 
-## Package for Codex
-
-The repository root is a valid Codex plugin directory and can be added to a Codex plugin marketplace as `smartpowers`. The shared skill is discovered through the `skills` path declared in `.codex-plugin/plugin.json`.
-
 ## Validate
 
 ```bash
-python3 -m json.tool .codex-plugin/plugin.json >/dev/null
+python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
+python3 -m json.tool plugins/smartpowers/.codex-plugin/plugin.json >/dev/null
 claude plugin validate . --strict
 python3 -m unittest discover -s tests -v
 ```
@@ -44,5 +118,5 @@ python3 -m unittest discover -s tests -v
 To validate workflow artifacts in a target project:
 
 ```bash
-python3 skills/smartpowers/scripts/validate_workflow.py --root /path/to/project --phase implementation
+python3 plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.py --root /path/to/project --phase implementation
 ```
