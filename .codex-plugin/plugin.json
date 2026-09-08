@@ -1,0 +1,31 @@
+{
+  "name": "smartpowers",
+  "version": "0.1.0",
+  "description": "A lightweight, review-gated product development workflow from requirements to implementation.",
+  "author": {
+    "name": "Yutaro Kijima"
+  },
+  "license": "MIT",
+  "keywords": [
+    "development-workflow",
+    "prd",
+    "software-design",
+    "implementation-planning"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Smartpowers",
+    "shortDescription": "Review-gated product development from idea to code.",
+    "longDescription": "Smartpowers guides requirements, technical design, implementation planning, and execution with explicit user approval gates and requirement traceability.",
+    "developerName": "Yutaro Kijima",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Write",
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Use Smartpowers to turn this product idea into an implementation.",
+      "Continue the Smartpowers workflow from the current project state."
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "smartpowers",
+  "displayName": "Smartpowers",
+  "version": "0.1.0",
+  "description": "A lightweight, review-gated product development workflow from requirements to implementation.",
+  "author": {
+    "name": "Yutaro Kijima"
+  },
+  "license": "MIT",
+  "keywords": [
+    "development-workflow",
+    "prd",
+    "software-design",
+    "implementation-planning"
+  ],
+  "skills": "./skills/"
+}
