@@ -1,6 +1,6 @@
 # PRD guide
 
-Use this guide only during requirements work. Create the document at `docs/PRD.md` and keep it concise enough for a user to review in one sitting.
+Use this guide only during requirements work. Create the document at `<project-root>/PRD.md` and keep it concise enough for a user to review in one sitting.
 
 ## Required structure
 
@@ -9,6 +9,7 @@ Use this guide only during requirements work. Create the document at `docs/PRD.m
 
 Status: Draft
 Last updated: YYYY-MM-DD
+Project: YYYYMMDD-HHMMSS-slug
 
 ## Summary
 

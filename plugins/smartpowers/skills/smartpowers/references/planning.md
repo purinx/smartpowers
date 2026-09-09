@@ -4,14 +4,15 @@ Use this guide only after the design is approved and the user agrees to the prop
 
 ## Plan index
 
-Create `tasks/PLAN.md`:
+Create `<project-root>/tasks/PLAN.md`:
 
 ```markdown
 # Implementation Plan
 
 Status: Draft
 Last updated: YYYY-MM-DD
-Design: docs/design_docs/FIRST_BUILD.md
+Project: YYYYMMDD-HHMMSS-slug
+Design: ../design_docs/FIRST_BUILD.md
 
 ## Delivery strategy
 
@@ -34,6 +35,7 @@ Use two-digit numeric prefixes and lowercase snake_case filenames: `01_infra_fou
 # 01: Infrastructure foundations
 
 Status: Planned
+Project: YYYYMMDD-HHMMSS-slug
 Requirements: NFR-001
 Depends on: None
 Parallel group: A
@@ -66,5 +68,6 @@ Parallel group: A
 - Merge tasks when separation would create placeholder code or unavoidable back-and-forth edits.
 - Put shared foundations before consumers.
 - Assign a parallel group only when tasks have no dependency edge and no overlapping file or migration ownership.
+- Compare expected code areas with other active projects before declaring tasks safe to run concurrently.
 - Include integration tasks when independently built pieces need explicit assembly or end-to-end verification.
 - Cover every PRD requirement across the numbered task files. A task may cover multiple related requirements.

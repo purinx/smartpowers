@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "smartpowers",
   "displayName": "Smartpowers",
-  "version": "0.1.0",
-  "description": "A lightweight, review-gated product development workflow from requirements to implementation.",
+  "version": "0.2.0",
+  "description": "A lightweight workflow for managing multiple review-gated projects in one repository.",
   "author": {
     "name": "Yutaro Kijima"
   },

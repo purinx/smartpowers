@@ -1,7 +1,7 @@
 interface:
   display_name: "Smartpowers"
-  short_description: "Review-gated workflow from product idea through implementation"
-  default_prompt: "Use $smartpowers to take this product idea from requirements through implementation."
+  short_description: "Manage reviewed project workflows inside existing repositories"
+  default_prompt: "Use $smartpowers to start a new timestamped project for this initiative."
 
 policy:
   allow_implicit_invocation: true

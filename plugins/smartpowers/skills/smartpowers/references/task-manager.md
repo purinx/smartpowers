@@ -21,8 +21,9 @@ Create one remote issue per numbered task file. Preserve the local task title an
 - dependencies and parallel group;
 - verification and acceptance criteria;
 - the repository-relative task-file path as the durable source reference.
+- the Smartpowers project ID so similarly named initiatives remain distinguishable.
 
-Represent dependencies with the task manager's native relationship when supported. Otherwise include them explicitly in the description. After creation, add the remote issue identifier and URL to the corresponding local task file under `Remote task:`.
+Prefix or label remote work with the project ID when the task manager supports it. Represent dependencies with the task manager's native relationship when supported. Otherwise include them explicitly in the description. After creation, add the remote issue identifier and URL to the corresponding local task file under `Remote task:`.
 
 If a remote operation partially fails, report exactly which issues were created, do not retry ambiguous writes blindly, and reconcile by searching before continuing.
 

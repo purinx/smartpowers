@@ -1,13 +1,26 @@
 # Smartpowers
 
-Smartpowers is a lightweight development-workflow plugin and marketplace for Codex and Claude Code. It takes a product idea through four explicit stages:
+Smartpowers is a lightweight development-workflow plugin and marketplace for Codex and Claude Code. It manages multiple independent initiatives inside an existing repository and takes each one through four explicit stages:
 
-1. requirements in `docs/PRD.md`;
-2. first-build design in `docs/design_docs/FIRST_BUILD.md`;
-3. reviewed implementation tasks in `tasks/` and optional task-manager synchronization;
+1. requirements in the selected project's `PRD.md`;
+2. first-build design in its `design_docs/FIRST_BUILD.md`;
+3. reviewed implementation tasks in its `tasks/` directory and optional task-manager synchronization;
 4. implementation in dependency order, with safe parallel work where supported.
 
-PRD, design, and task-plan transitions require explicit user approval. Stable `REQ-*` and `NFR-*` IDs keep requirements traceable through design and delivery.
+Each initiative gets an immutable, sortable ID such as `20260908-183045-oauth-refresh` and lives under `docs/smartpowers/projects/<project-id>/`. PRD, design, and task-plan transitions require explicit user approval. Stable `REQ-*` and `NFR-*` IDs keep requirements traceable within that project through design and delivery.
+
+```text
+docs/smartpowers/projects/20260908-183045-oauth-refresh/
+|-- PROJECT.md
+|-- PRD.md
+|-- design_docs/
+|   `-- FIRST_BUILD.md
+`-- tasks/
+    |-- PLAN.md
+    `-- 01_infra_foundations.md
+```
+
+Starting another initiative creates another timestamped directory, even when it uses the same slug. Existing project artifacts are selected explicitly and never merged implicitly.
 
 ## Repository layout
 
@@ -41,10 +54,10 @@ Start a new Codex or Claude Code session after installation. Invoke the workflow
 
 ```text
 # Codex
-$smartpowers Build ...
+$smartpowers Start a new project for ...
 
 # Claude Code
-/smartpowers:smartpowers Build ...
+/smartpowers:smartpowers Start a new project for ...
 ```
 
 ## Update
@@ -118,5 +131,11 @@ python3 -m unittest discover -s tests -v
 To validate workflow artifacts in a target project:
 
 ```bash
-python3 plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.py --root /path/to/project --phase implementation
+python3 plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.py \
+  --root /path/to/repository --list
+
+python3 plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.py \
+  --root /path/to/repository \
+  --project 20260908-183045-oauth-refresh \
+  --phase implementation
 ```

@@ -1,90 +1,127 @@
 ---
 name: smartpowers
-description: Guide a new product or substantial feature from an initial idea through reviewed requirements, technical design, implementation planning, and code delivery. Use when the user wants a structured end-to-end development workflow. Do not use for narrow fixes, isolated code edits, or requests that cover only one already-defined phase.
+description: Guide a new product or substantial feature through reviewed requirements, technical design, implementation planning, and code delivery inside an existing repository. Use when one repository may contain multiple concurrent or historical project workflows. Do not use for narrow fixes or isolated edits with an already-approved scope and design.
 ---
 
 # Smartpowers
 
-Move quickly by making decisions explicit, keeping documents small, and stopping only at decisions that require the user. Follow the user's language for questions and artifacts.
+Move quickly by making decisions explicit, keeping documents small, and isolating every initiative in its own timestamped project workspace. Follow the user's language for questions and artifacts.
+
+## Project workspaces
+
+All workflow artifacts belong under:
+
+```text
+docs/smartpowers/projects/<project-id>/
+```
+
+The immutable project ID is `<YYYYMMDD-HHMMSS>-<slug>`, for example `20260908-183045-oauth-refresh`. Use the repository's local timezone. Slugs use lowercase ASCII kebab-case and describe the initiative, not the whole repository.
+
+Each project owns this structure:
+
+```text
+<project-root>/
+|-- PROJECT.md
+|-- PRD.md
+|-- design_docs/
+|   `-- FIRST_BUILD.md
+`-- tasks/
+    |-- PLAN.md
+    `-- 01_infra_foundations.md
+```
+
+Never write workflow artifacts to repo-global `docs/PRD.md`, `docs/design_docs/FIRST_BUILD.md`, or `tasks/`. Requirement IDs are scoped to a project, so separate projects may each have `REQ-001`.
+
+## Select or create the project
+
+Inspect the existing repository, recent changes, and `docs/smartpowers/projects/` before choosing a workspace.
+
+- If the user names a project ID or path, use that project and state the selection.
+- If the current conversation already selected a project, keep it unless the user starts another.
+- If the user asks to resume and exactly one plausible active project exists, select it and state why.
+- If several projects could match, list their IDs, titles, statuses, and last-updated times, then ask the user to choose. Do not modify any candidate first.
+- If the user clearly starts a new initiative, create a new project even when its slug matches an older project.
+
+For a new project, derive a concise slug from the initiative and run:
+
+```bash
+python3 <plugin-root>/skills/smartpowers/scripts/init_project.py \
+  --root <repo-root> --title "<project title>" --slug <slug>
+```
+
+The script creates `PROJECT.md` and prints the project ID. Treat that ID and project root as fixed for the rest of the workflow. If legacy repo-global Smartpowers artifacts exist, ask which project they belong to before moving or copying them.
 
 ## Establish the current phase
 
-Inspect the repository and these artifacts before acting:
-
-- `docs/PRD.md`
-- `docs/design_docs/FIRST_BUILD.md`
-- `tasks/PLAN.md` and numbered `tasks/*.md` files
-- relevant source, project instructions, and connected task-management tools
-
-Use the latest explicit approval recorded in the documents and conversation. File existence alone is not approval. Never infer user approval from silence, previous edits, or your own assessment.
+Within the selected project only, inspect `PROJECT.md`, `PRD.md`, `design_docs/FIRST_BUILD.md`, `tasks/PLAN.md`, and numbered task files. File existence alone is not approval.
 
 Resume at the earliest incomplete gate:
 
 1. Requirements: PRD missing or `Status: Draft`.
 2. Design: PRD approved, design missing or `Status: Draft`.
-3. Planning: design approved, task structure not agreed, or `tasks/PLAN.md` is missing/draft.
+3. Planning: design approved, task structure not agreed, or plan missing/draft.
 4. Implementation: PRD, design, and task plan approved.
 
-If the artifacts conflict, explain the conflict and repair it in the earliest affected phase. Do not silently rewrite an approved upstream artifact.
+If selected-project artifacts conflict, repair the earliest affected phase. Never use another project's artifact to fill a gap, and never silently rewrite an approved upstream artifact.
 
 ## Approval protocol
 
-Use the same protocol for PRD, design, and detailed implementation plan reviews:
+Use this protocol for PRD, design, and detailed plan reviews:
 
-1. Write or revise the artifact with `Status: Draft`.
+1. Write or revise the selected project's artifact with `Status: Draft` and its `Project: <project-id>` field.
 2. Summarize material decisions, assumptions, and unresolved items.
-3. Ask the user to review the artifact and explicitly approve it or give feedback.
-4. If feedback arrives, update the artifact and repeat the review.
-5. Only after explicit approval of the latest revision, change it to `Status: Approved` and add `Approved: YYYY-MM-DD by user`.
+3. Ask the user to explicitly approve the latest revision or give feedback.
+4. Apply feedback and repeat the review until approved.
+5. After explicit approval, set `Status: Approved` and add `Approved: YYYY-MM-DD by user`.
 
-Stop at each approval request. Do not start work from the next phase in the same turn that produces a draft for review. If scope changes after approval, mark the affected artifact and all downstream artifacts `Status: Draft`, revise them in order, and regain approval.
+Stop at each approval request. Do not begin the next phase in the turn that produces a draft. If approved scope changes, mark the affected artifact and its downstream artifacts draft and regain approval in order.
 
 ## Phase 1: requirements
 
-Before drafting, inspect existing product context. Ask a small batch of only the questions whose answers could materially change scope, users, constraints, or success criteria. When the user does not know, offer a recommended assumption and record it instead of conducting an exhaustive interview.
+Inspect relevant repository context before interviewing. Ask only questions that could materially change scope, users, constraints, or success criteria. When the user does not know, recommend and record an assumption.
 
-Create `docs/PRD.md` from [the PRD guide](references/prd.md). Requirements must be testable and use stable IDs: `REQ-001`, `REQ-002`, and `NFR-001`. Include explicit out-of-scope decisions so later phases do not grow the product accidentally.
-
-Do not select a technology stack or write implementation design during this phase.
+Create `<project-root>/PRD.md` from [the PRD guide](references/prd.md). Use stable, testable IDs such as `REQ-001` and `NFR-001`, plus explicit out-of-scope decisions. Do not select a stack or write implementation design yet.
 
 ## Phase 2: design
 
-Start only from an approved PRD. Before drafting, ask the user for their preferred technology stack and material constraints such as deployment target, existing infrastructure, required integrations, budget, and operational ownership. If they have no preference, recommend a compact default with tradeoffs and obtain their choice before writing the design.
+Start from the selected project's approved PRD. Ask for technology preferences and constraints, taking the existing repository stack and architecture as the default constraint rather than assuming a greenfield build. If a new technology is warranted, present its integration and migration cost before the user chooses it.
 
-Create `docs/design_docs/FIRST_BUILD.md` from [the design guide](references/design.md). Keep it at first-build depth: enough to implement without rediscovering architecture, but no speculative future platform work.
-
-Every PRD requirement and non-functional requirement must appear in the traceability matrix and map to one or more concrete design sections. Resolve every uncovered requirement before asking for design approval.
+Create `<project-root>/design_docs/FIRST_BUILD.md` from [the design guide](references/design.md). Map every PRD requirement to concrete design sections and a verification approach.
 
 ## Phase 3: implementation planning
 
-Start only from an approved design. Planning has two gates:
+Start from the selected project's approved design. First show task titles, boundaries, dependency order, affected repository areas, and safe parallel groups. Create no task files until the user agrees to that granularity and order.
 
-1. Discuss a proposed task outline with the user before creating files. Show task titles, boundaries, dependency order, and safe parallel groups. Ask whether the granularity and order are right.
-2. After the outline is agreed, create `tasks/PLAN.md` and numbered task files such as `tasks/01_infra_foundations.md` using [the planning guide](references/planning.md). Set `tasks/PLAN.md` to `Status: Draft`, then run the detailed-plan review protocol.
-
-Each task must be independently understandable, cite its covered `REQ-*`/`NFR-*` IDs, state dependencies, name expected code areas, describe verification, and define completion criteria. Avoid tasks that merely say "implement the design."
-
-After the detailed local plan is approved, use [the task-manager integration guide](references/task-manager.md) when a Linear or equivalent task-management tool is available. Never create remote issues until the user identifies the target project and confirms the final task mapping.
+Then create `<project-root>/tasks/PLAN.md` and numbered task files using [the planning guide](references/planning.md), and run the detailed-plan approval protocol. After approval, use [the task-manager guide](references/task-manager.md) when Linear or an equivalent tool is available. Require the target remote project and final mapping before remote writes.
 
 ## Phase 4: implementation
 
-Implement approved tasks in dependency order. Before each task, read its task file and relevant design sections. Keep the task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. Mark it done only after its stated checks and acceptance criteria pass.
+Implement only the selected project's approved tasks in dependency order. Before starting, compare its expected code areas with other active Smartpowers projects. Surface overlapping ownership or incompatible migrations rather than assuming concurrent plans can safely modify the same code.
 
-Use the host's native subagent mechanism for tasks in the same declared parallel group when it is available and the user permits parallel agent work. Give each subagent a bounded task, explicit file ownership, dependencies, and verification commands. Do not parallelize tasks that edit the same files, depend on uncommitted outputs, share a migration boundary, or require the same external resource. Integrate and verify all parallel results in the main agent.
+Keep task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. Use host-native subagents for tasks in the same parallel group when available and permitted. Give each one the selected project ID, bounded task, explicit file ownership, dependencies, and verification commands. Never let a subagent switch projects implicitly.
 
-Stay within the approved plan. If implementation reveals a material requirement or architecture change, stop the affected work and return to the earliest impacted approval gate. Small implementation details consistent with the design do not require a new gate.
-
-After all tasks are done, run the repository's relevant test, lint, typecheck, and build commands. Report completed requirements, verification evidence, residual risks, and any deferred work.
+If implementation reveals a material requirement or architecture change, return the selected project to the earliest impacted approval gate. After all tasks pass their checks and repository-level verification, set `PROJECT.md` to `Status: Completed`, add `Completed: <ISO-8601 timestamp>`, and report delivered requirements and residual risks.
 
 ## Mechanical validation
 
-Run the bundled validator before requesting approval for a transition:
+List project workspaces:
 
 ```bash
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py --root <project-root> --phase requirements
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py --root <project-root> --phase design
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py --root <project-root> --phase plan
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py --root <project-root> --phase implementation
+python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+  --root <repo-root> --list
 ```
 
-Use the phase matching the artifact being reviewed; use `implementation` immediately before coding. Use `${CLAUDE_PLUGIN_ROOT}` as `<plugin-root>` in Claude Code when available. In other hosts, resolve the installed skill directory. The validator checks structure, approval gates, filenames, and requirement-ID coverage; it does not replace user review or engineering judgment.
+Validate the selected project before each transition:
+
+```bash
+python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+  --root <repo-root> --project <project-id> --phase requirements
+python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+  --root <repo-root> --project <project-id> --phase design
+python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+  --root <repo-root> --project <project-id> --phase plan
+python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+  --root <repo-root> --project <project-id> --phase implementation
+```
+
+Use `${CLAUDE_PLUGIN_ROOT}` as `<plugin-root>` in Claude Code when available. In other hosts, resolve the installed skill directory. Structural validation supplements, but never replaces, user review.

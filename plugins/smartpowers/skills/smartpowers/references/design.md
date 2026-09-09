@@ -1,6 +1,6 @@
 # First-build design guide
 
-Use this guide only after `docs/PRD.md` is approved and the user has chosen or accepted a technology stack. Create the design at `docs/design_docs/FIRST_BUILD.md`.
+Use this guide only after the selected project's `PRD.md` is approved and the user has chosen or accepted a technology stack. Create the design at `<project-root>/design_docs/FIRST_BUILD.md`.
 
 ## Required structure
 
@@ -9,7 +9,8 @@ Use this guide only after `docs/PRD.md` is approved and the user has chosen or a
 
 Status: Draft
 Last updated: YYYY-MM-DD
-PRD: docs/PRD.md
+Project: YYYYMMDD-HHMMSS-slug
+PRD: ../PRD.md
 
 ## Design summary
 
@@ -60,3 +61,5 @@ Omit an irrelevant operational section only with a one-line explanation. Add dom
 - If a requirement cannot be designed, return to the PRD rather than hiding the gap.
 
 Record decisions that constrain implementation. Avoid class-by-class pseudodesign, speculative scaling systems, and abstractions without a first-build use case.
+
+Treat the existing repository as part of the system context. Identify reused components, compatibility constraints, migrations, and intentionally unchanged areas. Do not describe the project as a greenfield application unless it actually is one.

@@ -1,7 +1,7 @@
 {
   "name": "smartpowers",
-  "version": "0.1.0",
-  "description": "A lightweight, review-gated product development workflow from requirements to implementation.",
+  "version": "0.2.0",
+  "description": "A lightweight workflow for managing multiple review-gated projects in one repository.",
   "author": {
     "name": "Yutaro Kijima"
   },
@@ -16,7 +16,7 @@
   "interface": {
     "displayName": "Smartpowers",
     "shortDescription": "Review-gated product development from idea to code.",
-    "longDescription": "Smartpowers guides requirements, technical design, implementation planning, and execution with explicit user approval gates and requirement traceability.",
+    "longDescription": "Smartpowers manages multiple timestamped project workflows inside an existing repository, with explicit approval gates and requirement traceability from PRD through delivery.",
     "developerName": "Yutaro Kijima",
     "category": "Developer Tools",
     "capabilities": [
