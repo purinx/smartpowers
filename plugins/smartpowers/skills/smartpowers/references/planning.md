@@ -12,7 +12,7 @@ Create `<project-root>/tasks/PLAN.md`:
 Status: Draft
 Last updated: YYYY-MM-DD
 Project: YYYYMMDD-HHMMSS-slug
-Design: ../design_docs/FIRST_BUILD.md
+Design: ../DESIGN_DOC.md
 
 ## Delivery strategy
 

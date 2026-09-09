@@ -30,8 +30,7 @@ class ValidateWorkflowTests(unittest.TestCase):
         self.project = (
             self.root / "docs" / "smartpowers" / "projects" / self.project_id
         )
-        (self.project / "design_docs").mkdir(parents=True)
-        (self.project / "tasks").mkdir()
+        (self.project / "tasks").mkdir(parents=True)
         self.write(
             "PROJECT.md",
             f"# Auth refresh\n\nProject: {self.project_id}\nStatus: Active\n",
@@ -52,7 +51,7 @@ class ValidateWorkflowTests(unittest.TestCase):
             "Approved: 2026-09-08 by user\n\nREQ-001: login\nNFR-001: latency\n",
         )
         self.write(
-            "design_docs/FIRST_BUILD.md",
+            "DESIGN_DOC.md",
             f"# Design\n\nStatus: Approved\nProject: {self.project_id}\n"
             "Approved: 2026-09-08 by user\n\nREQ-001 via auth flow\n"
             "NFR-001 via cache\n",
@@ -78,7 +77,7 @@ class ValidateWorkflowTests(unittest.TestCase):
     def test_design_reports_missing_requirement(self) -> None:
         self.valid_project()
         self.write(
-            "design_docs/FIRST_BUILD.md",
+            "DESIGN_DOC.md",
             f"# Design\n\nStatus: Draft\nProject: {self.project_id}\n\n"
             "REQ-001 via auth flow\n",
         )

@@ -23,14 +23,13 @@ Each project owns this structure:
 <project-root>/
 |-- PROJECT.md
 |-- PRD.md
-|-- design_docs/
-|   `-- FIRST_BUILD.md
+|-- DESIGN_DOC.md
 `-- tasks/
     |-- PLAN.md
     `-- 01_infra_foundations.md
 ```
 
-Never write workflow artifacts to repo-global `docs/PRD.md`, `docs/design_docs/FIRST_BUILD.md`, or `tasks/`. Requirement IDs are scoped to a project, so separate projects may each have `REQ-001`.
+Never write workflow artifacts to repo-global `docs/PRD.md`, `docs/DESIGN_DOC.md`, or `tasks/`. Requirement IDs are scoped to a project, so separate projects may each have `REQ-001`.
 
 ## Select or create the project
 
@@ -53,7 +52,7 @@ The script creates `PROJECT.md` and prints the project ID. Treat that ID and pro
 
 ## Establish the current phase
 
-Within the selected project only, inspect `PROJECT.md`, `PRD.md`, `design_docs/FIRST_BUILD.md`, `tasks/PLAN.md`, and numbered task files. File existence alone is not approval.
+Within the selected project only, inspect `PROJECT.md`, `PRD.md`, `DESIGN_DOC.md`, `tasks/PLAN.md`, and numbered task files. File existence alone is not approval.
 
 Resume at the earliest incomplete gate:
 
@@ -86,7 +85,7 @@ Create `<project-root>/PRD.md` from [the PRD guide](references/prd.md). Use stab
 
 Start from the selected project's approved PRD. Ask for technology preferences and constraints, taking the existing repository stack and architecture as the default constraint rather than assuming a greenfield build. If a new technology is warranted, present its integration and migration cost before the user chooses it.
 
-Create `<project-root>/design_docs/FIRST_BUILD.md` from [the design guide](references/design.md). Map every PRD requirement to concrete design sections and a verification approach.
+Create `<project-root>/DESIGN_DOC.md` from [the design guide](references/design.md). Map every PRD requirement to concrete design sections and a verification approach.
 
 ## Phase 3: implementation planning
 

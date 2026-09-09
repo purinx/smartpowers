@@ -3,7 +3,7 @@
 Smartpowers is a lightweight development-workflow plugin and marketplace for Codex and Claude Code. It manages multiple independent initiatives inside an existing repository and takes each one through four explicit stages:
 
 1. requirements in the selected project's `PRD.md`;
-2. first-build design in its `design_docs/FIRST_BUILD.md`;
+2. first-build design in its `DESIGN_DOC.md`;
 3. reviewed implementation tasks in its `tasks/` directory and optional task-manager synchronization;
 4. implementation in dependency order, with safe parallel work where supported.
 
@@ -13,8 +13,7 @@ Each initiative gets an immutable, sortable ID such as `20260908-183045-oauth-re
 docs/smartpowers/projects/20260908-183045-oauth-refresh/
 |-- PROJECT.md
 |-- PRD.md
-|-- design_docs/
-|   `-- FIRST_BUILD.md
+|-- DESIGN_DOC.md
 `-- tasks/
     |-- PLAN.md
     `-- 01_infra_foundations.md

@@ -1,6 +1,6 @@
 # First-build design guide
 
-Use this guide only after the selected project's `PRD.md` is approved and the user has chosen or accepted a technology stack. Create the design at `<project-root>/design_docs/FIRST_BUILD.md`.
+Use this guide only after the selected project's `PRD.md` is approved and the user has chosen or accepted a technology stack. Create the design at `<project-root>/DESIGN_DOC.md`.
 
 ## Required structure
 

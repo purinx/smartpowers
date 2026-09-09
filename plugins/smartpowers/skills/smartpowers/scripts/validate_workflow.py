@@ -130,7 +130,7 @@ def validate_design(
     project_root: Path, requirements: Set[str], require_approved: bool
 ) -> None:
     source = project_root / "PRD.md"
-    path = project_root / "design_docs" / "FIRST_BUILD.md"
+    path = project_root / "DESIGN_DOC.md"
     text = read_required(path)
     require_project(path, text, project_root.name)
     require_coverage(source, requirements, path, text)
