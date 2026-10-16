@@ -7,6 +7,16 @@ description: Guide a new product or substantial feature through reviewed require
 
 Move quickly by making decisions explicit, keeping documents small, and isolating every initiative in its own timestamped project workspace. Follow the user's language for questions and artifacts.
 
+## Initialize git first
+
+Before any other step, check whether the working directory is inside a git repository:
+
+```bash
+git rev-parse --is-inside-work-tree
+```
+
+If it is not, run `git init` at the intended repository root and tell the user. Do this before inspecting the repository, creating a project, or writing any artifact, so every workflow change is tracked from the start. Never re-initialize or modify an existing repository.
+
 ## Project workspaces
 
 All workflow artifacts belong under:
@@ -97,7 +107,7 @@ Then create `<project-root>/tasks/PLAN.md` and numbered task files using [the pl
 
 Implement only the selected project's approved tasks in dependency order. Before starting, compare its expected code areas with other active Smartpowers projects. Surface overlapping ownership or incompatible migrations rather than assuming concurrent plans can safely modify the same code.
 
-Keep task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. Use host-native subagents for tasks in the same parallel group when available and permitted. Give each one the selected project ID, bounded task, explicit file ownership, dependencies, and verification commands. Never let a subagent switch projects implicitly.
+Keep task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. When tasks are linked to Linear or another task manager, mirror every status change and meaningful progress to the remote issue as it happens, following [the task-manager guide](references/task-manager.md#progress-sync). Never batch remote updates until the end. Use host-native subagents for tasks in the same parallel group when available and permitted. Give each one the selected project ID, bounded task, linked remote issue if any, explicit file ownership, dependencies, and verification commands. Never let a subagent switch projects implicitly.
 
 If implementation reveals a material requirement or architecture change, return the selected project to the earliest impacted approval gate. After all tasks pass their checks and repository-level verification, set `PROJECT.md` to `Status: Completed`, add `Completed: <ISO-8601 timestamp>`, and report delivered requirements and residual risks.
 
