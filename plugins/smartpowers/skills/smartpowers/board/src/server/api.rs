@@ -3,6 +3,7 @@
 
 use crate::json::Json;
 use crate::project::comments::Comment;
+use crate::project::graph::{Graph, GraphIssue};
 use crate::project::log::LogEntry;
 use crate::project::{Project, ProjectSummary, Remote, Task};
 use crate::time::iso_utc;
@@ -25,8 +26,9 @@ pub fn projects(repo_name: &str, projects: &[ProjectSummary]) -> Json {
     ])
 }
 
-/// `GET /api/projects/<id>`: the summary fields plus phases, path, tasks,
-/// and which tasks have an agent listening for comments.
+/// `GET /api/projects/<id>`: the summary fields plus phases, path, tasks
+/// with their graph depth and readiness, graph issues, and which tasks have
+/// an agent listening for comments.
 pub fn project(project: &Project, listeners: &Listeners) -> Json {
     let mut fields = summary_fields(&project.summary);
     fields.push(("agentListening", Json::Bool(listeners.all_tasks)));
@@ -53,9 +55,13 @@ pub fn project(project: &Project, listeners: &Listeners) -> Json {
             project
                 .tasks
                 .iter()
-                .map(|t| task(t, listeners.tasks.contains(&t.number)))
+                .map(|t| task(t, &project.graph, listeners.tasks.contains(&t.number)))
                 .collect(),
         ),
+    ));
+    fields.push((
+        "graphIssues",
+        Json::Arr(project.graph.issues.iter().map(graph_issue).collect()),
     ));
     Json::Obj(fields)
 }
@@ -94,7 +100,8 @@ fn summary_fields(summary: &ProjectSummary) -> Vec<(&'static str, Json)> {
     ]
 }
 
-fn task(task: &Task, listening: bool) -> Json {
+fn task(task: &Task, graph: &Graph, listening: bool) -> Json {
+    let depth = graph.depth.get(&task.number).copied().unwrap_or(0);
     Json::Obj(vec![
         ("number", Json::str(&task.number)),
         ("file", Json::str(&task.file)),
@@ -103,7 +110,8 @@ fn task(task: &Task, listening: bool) -> Json {
         ("statusKey", Json::str(task.status_key.as_str())),
         ("requirements", Json::strings(&task.requirements)),
         ("dependsOn", Json::strings(&task.depends_on)),
-        ("parallelGroup", Json::str(&task.parallel_group)),
+        ("depth", Json::Num(u64::from(depth))),
+        ("ready", Json::Bool(graph.ready.contains(&task.number))),
         ("remote", task.remote.as_ref().map_or(Json::Null, remote)),
         ("updated", Json::Str(iso_utc(task.updated))),
         ("body", Json::str(&task.body)),
@@ -114,6 +122,20 @@ fn task(task: &Task, listening: bool) -> Json {
         ("log", Json::Arr(task.log.iter().map(log_entry).collect())),
         ("listening", Json::Bool(listening)),
     ])
+}
+
+fn graph_issue(issue: &GraphIssue) -> Json {
+    match issue {
+        GraphIssue::MissingDependency { task, dependency } => Json::Obj(vec![
+            ("kind", Json::str("missingDependency")),
+            ("task", Json::str(task)),
+            ("dependency", Json::str(dependency)),
+        ]),
+        GraphIssue::Cycle { tasks } => Json::Obj(vec![
+            ("kind", Json::str("cycle")),
+            ("tasks", Json::strings(tasks)),
+        ]),
+    }
 }
 
 fn remote(remote: &Remote) -> Json {
@@ -134,6 +156,8 @@ pub fn log_entry(entry: &LogEntry) -> Json {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
     use crate::project::comments::{self, Author};
     use crate::project::{load_project, log};
     use crate::test_support::{TempRepo, PROJECT_ID};
@@ -161,6 +185,43 @@ mod tests {
             r#""message":"Started""#,
             r#""agentListening":false"#,
             r#""listening":true}"#,
+            r#""dependsOn":["01"],"depth":1,"ready":false,"#,
+            r#""graphIssues":[]"#,
+        ] {
+            assert!(json.contains(expected), "missing {expected} in {json}");
+        }
+        assert!(!json.contains("parallelGroup"), "{json}");
+    }
+
+    #[test]
+    fn renders_graph_readiness_and_issues() {
+        let repo = TempRepo::new();
+        let write = |file: &str, text: &str| fs::write(repo.project().join(file), text).unwrap();
+        write(
+            "tasks/02_token_store.md",
+            "# 02: Token store\n\nStatus: Planned\nDepends on: 01\n",
+        );
+        write(
+            "tasks/03_cache.md",
+            "# 03: Cache\n\nStatus: Planned\nDepends on: [left](02_token_store.md), 09\n",
+        );
+        write(
+            "tasks/04_a.md",
+            "# 04: A\n\nStatus: Planned\nDepends on: 05\n",
+        );
+        write(
+            "tasks/05_b.md",
+            "# 05: B\n\nStatus: Planned\nDepends on: 04\n",
+        );
+        let project_data = load_project(&repo.workspace, PROJECT_ID).unwrap();
+        let json = project(&project_data, &Listeners::default()).render();
+        for expected in [
+            r#""dependsOn":["01"],"depth":1,"ready":true,"#,
+            r#""dependsOn":["02","09"],"depth":2,"ready":false,"#,
+            concat!(
+                r#""graphIssues":[{"kind":"missingDependency","task":"03","dependency":"09"},"#,
+                r#"{"kind":"cycle","tasks":["04","05"]}]"#
+            ),
         ] {
             assert!(json.contains(expected), "missing {expected} in {json}");
         }

@@ -2,9 +2,9 @@
 //! plus their comments and agent logs from the per-machine state directory.
 
 pub mod comments;
+pub mod graph;
 pub mod log;
 mod markdown;
-pub mod schedule;
 mod task;
 
 use std::collections::BTreeMap;
@@ -14,6 +14,7 @@ use std::time::SystemTime;
 
 use crate::files::{files_recursive, mtime};
 use crate::workspace::Workspace;
+use graph::Graph;
 use markdown::Header;
 pub use task::{Remote, StatusKey, Task};
 
@@ -51,10 +52,10 @@ pub struct Project {
     /// Repository-relative project directory.
     pub path: String,
     /// Task numbers in `tasks/PLAN.md` execution order.
-    // Unread until the dependency graph analysis uses it as input.
-    #[allow(dead_code)]
     pub plan_order: Vec<String>,
     pub tasks: Vec<Task>,
+    /// Depths, readiness, and issues computed from `tasks` and `plan_order`.
+    pub graph: Graph,
 }
 
 /// `YYYYMMDD-HHMMSS-lowercase-kebab-slug`. Also guards against path
@@ -135,15 +136,18 @@ pub fn load_project(workspace: &Workspace, id: &str) -> Option<Project> {
             }),
         })
         .collect();
-    Some(Project {
+    let mut project = Project {
         summary: summarize(&root, &tasks),
         phases,
         path: format!("{PROJECTS_PATH}/{id}"),
         plan_order: fs::read_to_string(root.join("tasks").join("PLAN.md"))
-            .map(|plan| schedule::plan_order(&plan))
+            .map(|plan| graph::plan_order(&plan))
             .unwrap_or_default(),
         tasks,
-    })
+        graph: Graph::default(),
+    };
+    project.graph = graph::analyze(&project.tasks, &project.plan_order);
+    Some(project)
 }
 
 fn summarize(project_root: &Path, tasks: &[Task]) -> ProjectSummary {
