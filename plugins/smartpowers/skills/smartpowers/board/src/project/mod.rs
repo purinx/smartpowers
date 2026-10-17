@@ -51,6 +51,8 @@ pub struct Project {
     /// Repository-relative project directory.
     pub path: String,
     /// Task numbers in `tasks/PLAN.md` execution order.
+    // Unread until the dependency graph analysis uses it as input.
+    #[allow(dead_code)]
     pub plan_order: Vec<String>,
     pub tasks: Vec<Task>,
 }
