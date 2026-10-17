@@ -27,10 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -49,8 +45,9 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path ${{ env.BOARD_MANIFEST }}
 
-      - name: Python tests
-        run: python -m unittest discover -s tests -v
+      - name: Shell tests
+        shell: bash
+        run: bash tests/run.sh
 
       - name: Release notes exist for the current version
         if: runner.os == 'Linux'

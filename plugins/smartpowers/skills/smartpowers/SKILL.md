@@ -54,7 +54,7 @@ Inspect the existing repository, recent changes, and `docs/smartpowers/projects/
 For a new project, derive a concise slug from the initiative and run:
 
 ```bash
-python3 <plugin-root>/skills/smartpowers/scripts/init_project.py \
+bash <plugin-root>/skills/smartpowers/scripts/init_project.sh \
   --root <repo-root> --title "<project title>" --slug <slug>
 ```
 
@@ -186,20 +186,20 @@ Only the lead agent edits task status, `PLAN.md`, and Linear, so parallel branch
 List project workspaces:
 
 ```bash
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+bash <plugin-root>/skills/smartpowers/scripts/validate_workflow.sh \
   --root <repo-root> --list
 ```
 
 Validate the selected project before each transition:
 
 ```bash
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+bash <plugin-root>/skills/smartpowers/scripts/validate_workflow.sh \
   --root <repo-root> --project <project-id> --phase requirements
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+bash <plugin-root>/skills/smartpowers/scripts/validate_workflow.sh \
   --root <repo-root> --project <project-id> --phase design
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+bash <plugin-root>/skills/smartpowers/scripts/validate_workflow.sh \
   --root <repo-root> --project <project-id> --phase plan
-python3 <plugin-root>/skills/smartpowers/scripts/validate_workflow.py \
+bash <plugin-root>/skills/smartpowers/scripts/validate_workflow.sh \
   --root <repo-root> --project <project-id> --phase implementation
 ```
 

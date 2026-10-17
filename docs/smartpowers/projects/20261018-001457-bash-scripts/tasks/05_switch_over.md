@@ -1,6 +1,6 @@
 # 05: 切り替えと Python の削除
 
-Status: Planned
+Status: Done
 Project: 20261018-001457-bash-scripts
 Requirements: REQ-005, REQ-008, REQ-009
 Depends on: 02, 03, 04

@@ -168,19 +168,20 @@ Then run `/smartpowers:smartpowers` with a product idea. During development, `/r
 ## Validate
 
 ```bash
-python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
-python3 -m json.tool plugins/smartpowers/.codex-plugin/plugin.json >/dev/null
 claude plugin validate . --strict
-python3 -m unittest discover -s tests -v
+bash tests/run.sh
+cargo test --manifest-path plugins/smartpowers/skills/smartpowers/board/Cargo.toml
 ```
+
+`tests/run.sh` runs the shell tests for the workflow scripts and plugin manifests; it needs only bash (3.2 or later) and standard Unix tools, and on Windows runs in Git Bash. `cargo test` covers the board, including end-to-end checks of the built server and a JSON syntax check of the manifests.
 
 To validate workflow artifacts in a target project:
 
 ```bash
-python3 plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.py \
+bash plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.sh \
   --root /path/to/repository --list
 
-python3 plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.py \
+bash plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.sh \
   --root /path/to/repository \
   --project 20260908-183045-oauth-refresh \
   --phase implementation

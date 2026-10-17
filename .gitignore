@@ -15,19 +15,6 @@ secrets*.json
 .codex/config.toml
 .codex/sessions/
 
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-coverage.xml
-htmlcov/
-*.egg-info/
-
 # Build and temporary output
 build/
 dist/
