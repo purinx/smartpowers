@@ -131,6 +131,8 @@ button, input, textarea { font: inherit; color: inherit; }
 .phase.approved { color: var(--text); }
 .phase.approved .phase-dot { background: var(--accent); }
 .phase.draft .phase-dot { background: var(--progress); }
+.phase.skipped { color: var(--text-3); border-style: dashed; }
+.phase.skipped { color: var(--text-3); text-decoration: line-through; }
 .phase-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); }
 .progress { display: flex; align-items: center; gap: 10px; }
 .progress-bar { width: 180px; height: 6px; background: var(--bg-active); border-radius: 999px; overflow: hidden; }

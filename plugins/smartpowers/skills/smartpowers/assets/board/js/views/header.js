@@ -5,7 +5,7 @@ import { state } from '../state.js';
 
 function phaseChip(phase) {
   const status = phase.status || 'Missing';
-  const tone = /^approved$/i.test(status) ? 'approved' : /^draft$/i.test(status) ? 'draft' : '';
+  const tone = /^approved$/i.test(status) ? 'approved' : /^draft$/i.test(status) ? 'draft' : /^skipped$/i.test(status) ? 'skipped' : '';
   return el('span', { class: 'phase ' + tone, title: phase.file + ': ' + status }, [
     el('span', { class: 'phase-dot' }),
     phase.name,

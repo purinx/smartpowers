@@ -113,14 +113,24 @@ pub fn load_project(workspace: &Workspace, id: &str) -> Option<Project> {
         comments = rest;
         task.log = log::load(&state, &task.number);
     }
+    let read_status = |file: &str| {
+        fs::read_to_string(root.join(file))
+            .ok()
+            .map(|text| Header::parse(&text).status())
+    };
+    let design_skipped = fs::read_to_string(root.join("PRD.md"))
+        .ok()
+        .and_then(|text| Header::parse(&text).field("design").map(str::to_lowercase))
+        .is_some_and(|design| design.starts_with("skipped"));
     let phases = PHASES
         .iter()
         .map(|&(name, file)| Phase {
             name,
             file,
-            status: fs::read_to_string(root.join(file))
-                .ok()
-                .map(|text| Header::parse(&text).status()),
+            status: read_status(file).or_else(|| {
+                // Small non-feature work may skip the design in its approved PRD.
+                (file == "DESIGN_DOC.md" && design_skipped).then(|| "Skipped".to_string())
+            }),
         })
         .collect();
     Some(Project {
@@ -194,6 +204,20 @@ mod tests {
         assert_eq!(project.summary.counts[&StatusKey::InProgress], 1);
         let phases: Vec<_> = project.phases.iter().map(|p| p.status.as_deref()).collect();
         assert_eq!(phases, [Some("Approved"), Some("Draft"), Some("Approved")]);
+
+        fs::remove_file(repo.project().join("DESIGN_DOC.md")).unwrap();
+        let design = |repo: &TempRepo| {
+            load_project(&repo.workspace, PROJECT_ID).unwrap().phases[1]
+                .status
+                .clone()
+        };
+        assert_eq!(design(&repo), None);
+        fs::write(
+            repo.project().join("PRD.md"),
+            "# PRD\n\nStatus: Approved\nDesign: Skipped - helper script\n",
+        )
+        .unwrap();
+        assert_eq!(design(&repo).as_deref(), Some("Skipped"));
 
         assert!(load_project(&repo.workspace, "../etc").is_none());
         assert_eq!(list_projects(&repo.workspace).len(), 1);
