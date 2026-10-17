@@ -1,6 +1,6 @@
 # 04: ボードの Flow 表示
 
-Status: Planned
+Status: In Progress
 Project: 20261018-010816-execution-flowchart
 Requirements: REQ-002, REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, REQ-012, REQ-013, NFR-001, NFR-003, NFR-004, NFR-005
 Depends on: 02
