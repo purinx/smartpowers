@@ -1,6 +1,6 @@
 # 02: ボードの E2E テストの Rust 化
 
-Status: In Progress
+Status: Done
 Project: 20261018-001457-bash-scripts
 Requirements: REQ-007
 Depends on: None
