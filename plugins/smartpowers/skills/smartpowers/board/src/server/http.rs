@@ -8,7 +8,8 @@ use std::net::TcpStream;
 use crate::json::Json;
 
 const LOOPBACK_HOSTS: [&str; 4] = ["127.0.0.1", "localhost", "::1", "[::1]"];
-const MAX_HEAD_BYTES: u64 = 64 * 1024;
+const MAX_HEAD_BYTES: usize = 64 * 1024;
+pub const MAX_BODY_BYTES: usize = 64 * 1024;
 
 pub fn is_loopback(host: &str) -> bool {
     LOOPBACK_HOSTS.contains(&host)
@@ -20,9 +21,19 @@ pub struct Request {
     pub path: String,
     /// Header names are lowercased.
     headers: BTreeMap<String, String>,
+    pub body: Vec<u8>,
+    /// The declared body exceeded `MAX_BODY_BYTES` and was not read.
+    pub body_too_large: bool,
 }
 
 impl Request {
+    /// Browsers always send Origin on POST, including same-origin fetches,
+    /// so state-changing requests require it. With `is_trusted` this stops
+    /// other sites from posting comments through the user's browser.
+    pub fn has_origin(&self) -> bool {
+        self.headers.contains_key("origin")
+    }
+
     /// The board exposes repository files, so reject requests whose Host or
     /// Origin is not loopback. This blocks DNS rebinding and cross-site reads.
     pub fn is_trusted(&self) -> bool {
@@ -41,7 +52,7 @@ impl Request {
 }
 
 pub fn read_request(stream: &TcpStream) -> Option<Request> {
-    let mut reader = BufReader::new(stream.take(MAX_HEAD_BYTES));
+    let mut reader = BufReader::new(stream.take((MAX_HEAD_BYTES + MAX_BODY_BYTES) as u64));
     let mut line = String::new();
     reader.read_line(&mut line).ok()?;
     let mut parts = line.split_whitespace();
@@ -63,10 +74,23 @@ pub fn read_request(stream: &TcpStream) -> Option<Request> {
             headers.insert(name.trim().to_lowercase(), value.trim().to_string());
         }
     }
+
+    let length: usize = match headers.get("content-length") {
+        Some(value) => value.parse().ok()?,
+        None => 0,
+    };
+    let body_too_large = length > MAX_BODY_BYTES;
+    let mut body = Vec::new();
+    if length > 0 && !body_too_large {
+        body.resize(length, 0);
+        reader.read_exact(&mut body).ok()?;
+    }
     Some(Request {
         method,
         path,
         headers,
+        body,
+        body_too_large,
     })
 }
 
@@ -137,6 +161,8 @@ mod tests {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
+            body: Vec::new(),
+            body_too_large: false,
         }
     }
 

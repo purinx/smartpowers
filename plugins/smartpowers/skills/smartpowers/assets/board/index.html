@@ -70,6 +70,20 @@
         <h2 id="panel-title" class="panel-title"></h2>
         <dl id="panel-props" class="props"></dl>
         <article id="panel-body" class="markdown"></article>
+        <section class="activity" aria-labelledby="activity-title">
+          <h3 id="activity-title" class="section-title">Activity</h3>
+          <ol id="panel-activity" class="timeline"></ol>
+          <!-- Static so live re-renders never wipe a draft; see js/views/composer.js. -->
+          <form id="comment-form" class="composer">
+            <textarea id="comment-input" rows="3" maxlength="8000"
+                      placeholder="Leave feedback for the agent working on this task…"></textarea>
+            <div class="composer-actions">
+              <span id="comment-status" class="composer-status" role="status"></span>
+              <span class="composer-hint">⌘/Ctrl + Enter</span>
+              <button type="submit" class="btn-primary">Comment</button>
+            </div>
+          </form>
+        </section>
       </div>
     </aside>
   </div>

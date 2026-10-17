@@ -8,6 +8,24 @@ async function fetchJSON(url) {
   return response.json();
 }
 
+// Add a comment to a task. The server stores it outside the repository and
+// agents read it with `board inbox`.
+export async function postComment(projectId, taskNumber, body) {
+  const url = '/api/projects/' + encodeURIComponent(projectId)
+    + '/tasks/' + encodeURIComponent(taskNumber) + '/comments';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    body,
+  });
+  if (!response.ok) {
+    let message = String(response.status);
+    try { message = (await response.json()).error || message; } catch (_) {}
+    throw new Error(message);
+  }
+  return response.json();
+}
+
 // Refresh the project list and the selected project's detail into `state`.
 // Falls back to the newest project when the selection no longer exists.
 export async function loadState() {

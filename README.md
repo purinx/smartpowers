@@ -56,7 +56,22 @@ plugins\smartpowers\skills\smartpowers\scripts\board.cmd --root <repo-root>
 
 The board server is a single Rust program with the web UI embedded, using only the standard library (no third-party crates). The first launch compiles it with `cargo build --release` into `board/target/`, which takes a few seconds. Later launches reuse that build and recompile only after a plugin update changes the source. Run the board's tests with `cargo test --manifest-path plugins/smartpowers/skills/smartpowers/board/Cargo.toml`.
 
-It starts a local, read-only server on `127.0.0.1` and opens a Linear-style board in your browser. You get board and list views per project grouped by task status, the approval state of each phase, overall progress, dependency waits, and links to remote issues. The page updates live whenever task files change, so you can watch implementation progress as the agent works. Keyboard: `b` board, `l` list, `/` filter, `Esc` close. Options: `--project <id>`, `--port <n>`, `--no-open`.
+It starts a local server on `127.0.0.1` and opens a Linear-style board in your browser. You get board and list views per project grouped by task status, the approval state of each phase, overall progress, dependency waits, and links to remote issues. The page updates live, so you can watch implementation progress as the agent works. Keyboard: `b` board, `l` list, `/` filter, `Esc` close. Options: `--project <id>`, `--port <n>`, `--no-open`.
+
+### Steer the agent from the board
+
+Each task's detail panel has an **Activity** section and a comment box:
+
+- **Progress log:** the agent records what it did and what is next with `board log`. The latest entry also appears on in-progress cards.
+- **Comments:** type feedback and press <kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd>. While the agent implements tasks, it keeps `board inbox --wait` running in the background. Your comment ends that wait, so the agent sees it during its current work rather than at the end. The agent then adjusts course and answers with `board reply`, and the comment shows **Waiting for agent → Sent to agent → Addressed**.
+
+```bash
+board inbox --project <id> [--wait] [--timeout <secs>]           # new comments, each delivered once
+board reply --project <id> --comment <id> [--resolve] <message>  # answer as the agent
+board log   --project <id> --task <nn> <message>                 # add a progress entry
+```
+
+Comments and logs live outside the repository, in `~/.local/state/smartpowers/<repo>-<hash>/` (Windows: `%LOCALAPPDATA%\smartpowers\state`; override with `SMARTPOWERS_STATE_HOME`). Agents treat comments as your instructions, so keeping them out of version control means a file someone commits can never pose as your feedback. The board writes nothing to the repository, and it accepts new comments only from its own page.
 
 ## Install from GitHub
 

@@ -3,16 +3,15 @@
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::files::files_recursive;
-use crate::project::PROJECTS_PATH;
+use crate::workspace::Workspace;
 
-/// A version counter that increases whenever any project Markdown file
-/// is added, removed, or modified.
+/// A version counter that increases whenever any project Markdown file,
+/// comment, or log is added, removed, or modified.
 pub struct Watcher {
     version: Mutex<u64>,
     changed: Condvar,
@@ -26,14 +25,14 @@ impl Watcher {
         })
     }
 
-    /// Start polling `repo_root` every `interval` on a background thread.
-    pub fn spawn(self: &Arc<Self>, repo_root: PathBuf, interval: Duration) {
+    /// Start polling the workspace every `interval` on a background thread.
+    pub fn spawn(self: &Arc<Self>, workspace: Arc<Workspace>, interval: Duration) {
         let watcher = Arc::clone(self);
         thread::spawn(move || {
-            let mut current = fingerprint(&repo_root);
+            let mut current = fingerprint(&workspace);
             loop {
                 thread::sleep(interval);
-                let next = fingerprint(&repo_root);
+                let next = fingerprint(&workspace);
                 if next != current {
                     current = next;
                     *watcher.version.lock().unwrap() += 1;
@@ -59,9 +58,12 @@ impl Watcher {
     }
 }
 
-/// Hash of every project Markdown file's path, mtime, and size.
-fn fingerprint(repo_root: &Path) -> u64 {
-    let mut entries: Vec<String> = files_recursive(&repo_root.join(PROJECTS_PATH))
+/// Hash of the path, mtime, and size of every Markdown file in the projects
+/// tree and the state directory.
+fn fingerprint(workspace: &Workspace) -> u64 {
+    let mut files = files_recursive(&workspace.projects_dir());
+    files.extend(files_recursive(&workspace.state_dir));
+    let mut entries: Vec<String> = files
         .iter()
         .filter(|path| path.extension().is_some_and(|ext| ext == "md"))
         .filter_map(|path| {
@@ -84,18 +86,34 @@ fn fingerprint(repo_root: &Path) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project::log;
     use crate::test_support::TempRepo;
+
+    fn watch(repo: &TempRepo) -> Arc<Watcher> {
+        let watcher = Watcher::new();
+        let workspace =
+            Workspace::with_state_dir(repo.root.clone(), repo.workspace.state_dir.clone());
+        watcher.spawn(Arc::new(workspace), Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(100));
+        watcher
+    }
 
     #[test]
     fn detects_task_changes() {
         let repo = TempRepo::new();
-        let watcher = Watcher::new();
-        watcher.spawn(repo.root.clone(), Duration::from_millis(50));
-        thread::sleep(Duration::from_millis(100));
+        let watcher = watch(&repo);
         let task = repo.project().join("tasks/02_token_store.md");
         let text = fs::read_to_string(&task).unwrap();
         // Change the size too, in case mtime resolution is coarse.
         fs::write(&task, text.replace("In Progress", "Done!")).unwrap();
+        assert_eq!(watcher.wait(0, Duration::from_secs(3)), 1);
+    }
+
+    #[test]
+    fn detects_new_logs_in_the_state_directory() {
+        let repo = TempRepo::new();
+        let watcher = watch(&repo);
+        log::append(&repo.project_state(), "02", "Started").unwrap();
         assert_eq!(watcher.wait(0, Duration::from_secs(3)), 1);
     }
 }

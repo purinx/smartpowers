@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use super::comments::Comment;
+use super::log::LogEntry;
 use super::markdown::{find_issue_key, find_url, requirement_ids, task_refs, Header};
 use crate::files::mtime;
 
@@ -59,6 +61,9 @@ pub struct Task {
     pub remote: Option<Remote>,
     pub updated: SystemTime,
     pub body: String,
+    /// Filled from the state directory by `load_project`.
+    pub comments: Vec<Comment>,
+    pub log: Vec<LogEntry>,
 }
 
 impl Task {
@@ -88,6 +93,8 @@ impl Task {
             remote: parse_remote(&body),
             updated: mtime(path),
             body,
+            comments: Vec::new(),
+            log: Vec::new(),
         })
     }
 }

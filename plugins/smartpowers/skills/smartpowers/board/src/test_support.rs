@@ -5,13 +5,16 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::project::PROJECTS_PATH;
+use crate::workspace::Workspace;
 
 pub const PROJECT_ID: &str = "20260908-183045-oauth-refresh";
 
 /// A throwaway repository with one project: task 01 is Done and linked to
-/// ENG-42, task 02 is In Progress and depends on 01. Deleted on drop.
+/// ENG-42, task 02 is In Progress and depends on 01. Its state directory
+/// lives inside the temp root. Everything is deleted on drop.
 pub struct TempRepo {
     pub root: PathBuf,
+    pub workspace: Workspace,
 }
 
 impl TempRepo {
@@ -22,7 +25,8 @@ impl TempRepo {
             std::process::id(),
             COUNTER.fetch_add(1, Ordering::SeqCst)
         ));
-        let repo = TempRepo { root };
+        let workspace = Workspace::with_state_dir(root.clone(), root.join("state"));
+        let repo = TempRepo { root, workspace };
         let project = repo.project();
         fs::create_dir_all(project.join("tasks")).unwrap();
         let write = |path: &str, text: String| fs::write(project.join(path), text).unwrap();
@@ -55,6 +59,10 @@ impl TempRepo {
 
     pub fn project(&self) -> PathBuf {
         self.root.join(PROJECTS_PATH).join(PROJECT_ID)
+    }
+
+    pub fn project_state(&self) -> PathBuf {
+        self.workspace.project_state(PROJECT_ID)
     }
 }
 

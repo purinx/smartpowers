@@ -19,6 +19,7 @@ import { renderContent } from './views/content.js';
 import { renderHeader } from './views/header.js';
 import { renderPanel } from './views/panel.js';
 import { initPanelResize } from './views/panel-resize.js';
+import { initComposer } from './views/composer.js';
 import { renderSidebar } from './views/sidebar.js';
 
 function render() {
@@ -86,6 +87,7 @@ byId('panel-close').addEventListener('click', closeTask);
 window.addEventListener('hashchange', onHashChange);
 document.addEventListener('keydown', onKeyDown);
 initPanelResize();
+initComposer(reload); // show a new comment right away instead of waiting for the watcher
 
 applyHash();
 reload();

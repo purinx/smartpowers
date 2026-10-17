@@ -1,5 +1,8 @@
-//! Smartpowers project workspaces under `docs/smartpowers/projects/<id>/`.
+//! Smartpowers project workspaces under `docs/smartpowers/projects/<id>/`,
+//! plus their comments and agent logs from the per-machine state directory.
 
+pub mod comments;
+pub mod log;
 mod markdown;
 mod task;
 
@@ -9,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use crate::files::{files_recursive, mtime};
+use crate::workspace::Workspace;
 use markdown::Header;
 pub use task::{Remote, StatusKey, Task};
 
@@ -71,8 +75,8 @@ fn is_slug(value: &str) -> bool {
 }
 
 /// All projects, newest first (IDs start with their creation timestamp).
-pub fn list_projects(repo_root: &Path) -> Vec<ProjectSummary> {
-    let Ok(entries) = fs::read_dir(repo_root.join(PROJECTS_PATH)) else {
+pub fn list_projects(workspace: &Workspace) -> Vec<ProjectSummary> {
+    let Ok(entries) = fs::read_dir(workspace.projects_dir()) else {
         return Vec::new();
     };
     let mut roots: Vec<PathBuf> = entries
@@ -89,15 +93,23 @@ pub fn list_projects(repo_root: &Path) -> Vec<ProjectSummary> {
         .collect()
 }
 
-pub fn load_project(repo_root: &Path, id: &str) -> Option<Project> {
+pub fn load_project(workspace: &Workspace, id: &str) -> Option<Project> {
     if !is_project_id(id) {
         return None;
     }
-    let root = repo_root.join(PROJECTS_PATH).join(id);
+    let root = workspace.projects_dir().join(id);
     if !root.is_dir() {
         return None;
     }
-    let tasks = task::load_tasks(&root);
+    let state = workspace.project_state(id);
+    let mut comments = comments::load(&state);
+    let mut tasks = task::load_tasks(&root);
+    for task in &mut tasks {
+        let (mine, rest) = comments.into_iter().partition(|c| c.task == task.number);
+        task.comments = mine;
+        comments = rest;
+        task.log = log::load(&state, &task.number);
+    }
     let phases = PHASES
         .iter()
         .map(|&(name, file)| Phase {
@@ -155,6 +167,7 @@ fn summarize(project_root: &Path, tasks: &[Task]) -> ProjectSummary {
 mod tests {
     use super::*;
     use crate::test_support::{TempRepo, PROJECT_ID};
+    use comments::Author;
 
     #[test]
     fn validates_project_ids() {
@@ -167,7 +180,7 @@ mod tests {
     #[test]
     fn loads_project_summary_and_phases() {
         let repo = TempRepo::new();
-        let project = load_project(&repo.root, PROJECT_ID).unwrap();
+        let project = load_project(&repo.workspace, PROJECT_ID).unwrap();
         assert_eq!(project.summary.title, "OAuth refresh");
         assert_eq!(project.summary.status, "Active");
         assert_eq!(project.summary.task_count, 2);
@@ -176,7 +189,19 @@ mod tests {
         let phases: Vec<_> = project.phases.iter().map(|p| p.status.as_deref()).collect();
         assert_eq!(phases, [Some("Approved"), Some("Draft"), Some("Approved")]);
 
-        assert!(load_project(&repo.root, "../etc").is_none());
-        assert_eq!(list_projects(&repo.root).len(), 1);
+        assert!(load_project(&repo.workspace, "../etc").is_none());
+        assert_eq!(list_projects(&repo.workspace).len(), 1);
+    }
+
+    #[test]
+    fn attaches_comments_and_logs_to_their_tasks() {
+        let repo = TempRepo::new();
+        let state = repo.project_state();
+        comments::create(&state, "02", Author::User, "Add retries", None).unwrap();
+        log::append(&state, "02", "Started").unwrap();
+        let project = load_project(&repo.workspace, PROJECT_ID).unwrap();
+        assert!(project.tasks[0].comments.is_empty() && project.tasks[0].log.is_empty());
+        assert_eq!(project.tasks[1].comments[0].body, "Add retries");
+        assert_eq!(project.tasks[1].log[0].message, "Started");
     }
 }

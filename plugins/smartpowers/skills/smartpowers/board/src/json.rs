@@ -2,6 +2,7 @@
 
 pub enum Json {
     Null,
+    Bool(bool),
     Num(u64),
     Str(String),
     Arr(Vec<Json>),
@@ -30,6 +31,7 @@ impl Json {
     fn write(&self, out: &mut String) {
         match self {
             Json::Null => out.push_str("null"),
+            Json::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
             Json::Num(n) => out.push_str(&n.to_string()),
             Json::Str(s) => write_str(s, out),
             Json::Arr(items) => {

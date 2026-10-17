@@ -3,7 +3,7 @@
 import { el } from '../dom.js';
 import { openTask } from '../router.js';
 import { columnsFor, statusIcon, tasksIn } from '../status.js';
-import { remoteLink, taskChips, taskClasses } from './task-parts.js';
+import { latestLog, remoteLink, taskChips, taskClasses } from './task-parts.js';
 
 function card(task) {
   const node = el('div', {
@@ -14,6 +14,7 @@ function card(task) {
   }, [
     el('div', { class: 'card-top' }, [el('span', { class: 'mono' }, task.number), remoteLink(task)]),
     el('div', { class: 'card-title' }, [statusIcon(task.statusKey), el('span', null, task.title)]),
+    latestLog(task),
   ]);
   const chips = taskChips(task, true);
   if (chips.length) node.appendChild(el('div', { class: 'card-meta' }, chips));

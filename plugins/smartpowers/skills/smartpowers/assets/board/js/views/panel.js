@@ -5,6 +5,8 @@ import { renderMarkdown, taskBody } from '../markdown.js';
 import { openTask } from '../router.js';
 import { state, taskByNumber } from '../state.js';
 import { statusIcon } from '../status.js';
+import { renderActivity } from './activity.js';
+import { syncComposer } from './composer.js';
 
 function dependencyChips(task) {
   if (!task.dependsOn.length) return 'None';
@@ -41,10 +43,12 @@ function properties(task) {
 export function renderPanel() {
   const task = state.taskNumber && taskByNumber(state.taskNumber);
   byId('panel').hidden = !task;
+  syncComposer();
   if (!task) return;
   byId('panel-id').textContent = state.project.id + ' / ' + task.number;
   byId('panel-title').textContent = task.title;
   byId('panel-props').replaceChildren(...properties(task));
   // renderMarkdown escapes its input before adding tags.
   byId('panel-body').innerHTML = renderMarkdown(taskBody(task.body));
+  byId('panel-activity').replaceChildren(...renderActivity(task));
 }

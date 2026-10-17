@@ -2,6 +2,7 @@
 
 import { el } from '../dom.js';
 import { state, taskByNumber, changedSinceLastRender } from '../state.js';
+import { openComments } from './activity.js';
 
 // Dependencies that are not Done yet.
 export function waitingOn(task) {
@@ -16,6 +17,10 @@ export function waitingOn(task) {
 // `compact` shows at most two requirement IDs plus a "+N" overflow chip.
 export function taskChips(task, compact) {
   const chips = [];
+  const open = openComments(task).length;
+  if (open) {
+    chips.push(el('span', { class: 'chip comments', title: 'Open comments for the agent' }, '💬 ' + open));
+  }
   const waiting = waitingOn(task);
   if (waiting.length) {
     chips.push(el('span', { class: 'chip warn', title: 'Waiting on unfinished dependencies' }, '⧗ ' + waiting.join(', ')));
@@ -42,6 +47,13 @@ export function remoteLink(task) {
     rel: 'noopener',
     onclick: (event) => event.stopPropagation(), // don't also open the panel
   }, label);
+}
+
+// The agent's latest progress entry, shown on cards of tasks in progress.
+export function latestLog(task) {
+  if (task.statusKey !== 'in_progress' || !task.log.length) return null;
+  const entry = task.log[task.log.length - 1];
+  return el('div', { class: 'card-log', title: entry.message }, entry.message);
 }
 
 // CSS classes for a clickable task row or card.

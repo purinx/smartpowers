@@ -2,6 +2,8 @@
 //! `assets/board/js`; change both sides together.
 
 use crate::json::Json;
+use crate::project::comments::Comment;
+use crate::project::log::LogEntry;
 use crate::project::{Project, ProjectSummary, Remote, Task};
 use crate::time::iso_utc;
 
@@ -45,6 +47,20 @@ pub fn project(project: &Project) -> Json {
     Json::Obj(fields)
 }
 
+/// One comment, as listed under a task and returned by
+/// `POST /api/projects/<id>/tasks/<n>/comments`.
+pub fn comment(comment: &Comment) -> Json {
+    Json::Obj(vec![
+        ("id", Json::str(&comment.id)),
+        ("author", Json::str(comment.author.as_str())),
+        ("created", Json::str(&comment.created)),
+        ("status", Json::str(comment.status.as_str())),
+        ("delivered", Json::Bool(comment.delivered)),
+        ("replyTo", Json::opt_str(comment.reply_to.as_deref())),
+        ("body", Json::str(&comment.body)),
+    ])
+}
+
 pub fn error(message: &str) -> Json {
     Json::Obj(vec![("error", Json::str(message))])
 }
@@ -78,6 +94,11 @@ fn task(task: &Task) -> Json {
         ("remote", task.remote.as_ref().map_or(Json::Null, remote)),
         ("updated", Json::Str(iso_utc(task.updated))),
         ("body", Json::str(&task.body)),
+        (
+            "comments",
+            Json::Arr(task.comments.iter().map(comment).collect()),
+        ),
+        ("log", Json::Arr(task.log.iter().map(log_entry).collect())),
     ])
 }
 
@@ -89,16 +110,26 @@ fn remote(remote: &Remote) -> Json {
     ])
 }
 
+fn log_entry(entry: &LogEntry) -> Json {
+    Json::Obj(vec![
+        ("time", Json::str(&entry.time)),
+        ("message", Json::str(&entry.message)),
+    ])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::project::load_project;
+    use crate::project::comments::{self, Author};
+    use crate::project::{load_project, log};
     use crate::test_support::{TempRepo, PROJECT_ID};
 
     #[test]
     fn renders_the_project_contract() {
         let repo = TempRepo::new();
-        let json = project(&load_project(&repo.root, PROJECT_ID).unwrap()).render();
+        comments::create(&repo.project_state(), "02", Author::User, "Hi", None).unwrap();
+        log::append(&repo.project_state(), "02", "Started").unwrap();
+        let json = project(&load_project(&repo.workspace, PROJECT_ID).unwrap()).render();
         for expected in [
             r#""title":"OAuth refresh""#,
             r#""counts":{"in_progress":1,"done":1}"#,
@@ -108,6 +139,9 @@ mod tests {
             r#""dependsOn":["01"]"#,
             r#""key":"ENG-42""#,
             r#""remote":null"#,
+            r#""author":"user","#,
+            r#""status":"open","delivered":false,"replyTo":null,"body":"Hi""#,
+            r#""message":"Started""#,
         ] {
             assert!(json.contains(expected), "missing {expected} in {json}");
         }
