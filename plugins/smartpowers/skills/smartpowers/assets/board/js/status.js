@@ -20,7 +20,7 @@ const ICONS = {
     '<path d="M4.5 7h5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>',
   done:
     '<circle cx="7" cy="7" r="6" fill="var(--done)"/>' +
-    '<path d="M4.4 7.2l1.8 1.8 3.4-3.6" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M4.4 7.2l1.8 1.8 3.4-3.6" stroke="var(--on-accent)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   other: '<circle cx="7" cy="7" r="5.5" fill="none" stroke="var(--other)" stroke-width="1.5"/>',
 };
 
