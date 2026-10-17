@@ -1,6 +1,6 @@
 # 01: board next の削除
 
-Status: Planned
+Status: In Progress
 Project: 20261018-010816-execution-flowchart
 Requirements: REQ-004
 Depends on: None

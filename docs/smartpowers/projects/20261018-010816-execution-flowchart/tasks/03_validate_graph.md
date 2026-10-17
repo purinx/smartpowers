@@ -1,6 +1,6 @@
 # 03: 検証スクリプトのグラフ検査
 
-Status: Planned
+Status: In Progress
 Project: 20261018-010816-execution-flowchart
 Requirements: REQ-002, REQ-003
 Depends on: None
