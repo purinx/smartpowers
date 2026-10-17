@@ -105,7 +105,7 @@ To skip, add `Design: Skipped - <one-line reason>` below `Status:` in the PRD he
 
 ## Phase 3: implementation planning
 
-Start from the selected project's approved design, or from its approved PRD when the design is skipped. First show task titles, boundaries, dependency order, affected repository areas, and safe parallel groups. Create no task files until the user agrees to that granularity and order.
+Start from the selected project's approved design, or from its approved PRD when the design is skipped. First show task titles, boundaries, dependency order, affected repository areas, and which tasks can run concurrently because no dependency path connects them. Create no task files until the user agrees to that granularity and order.
 
 Then create `<project-root>/tasks/PLAN.md` and numbered task files using [the planning guide](references/planning.md), and run the detailed-plan approval protocol. After approval, use [the task-manager guide](references/task-manager.md) when Linear or an equivalent tool is available. Require the target remote project and final mapping before remote writes.
 
@@ -137,7 +137,7 @@ When the user asks to see progress in the browser, or at the start of implementa
   --root <repo-root> --project <project-id>
 ```
 
-On Windows run `scripts\board.cmd` instead. The launcher builds the Rust source in `board/` with `cargo` on first use and then reuses the build. If `cargo` is not on PATH or in `~/.cargo/bin`, the launcher installs a private Rust toolchain with rustup into `~/.cache/smartpowers/rust` (Windows: `%LOCALAPPDATA%\smartpowers\rust`). That is a one-time download of about 450 MB from rust-lang.org, and it leaves PATH, shell profiles, and `~/.cargo` unchanged. On a machine without Rust, tell the user about this download when you launch the board. If the launcher reports a missing C linker, relay its install hint and do not install system packages yourself. Run it in the background (in Claude Code: `run_in_background: true`) and relay the `Smartpowers board: http://localhost:<port>/...` URL it prints. It opens the browser unless `--no-open` is given. The board shows every project's tasks as Linear-style board and list views grouped by `Status:`, the PRD/design/plan approval state, dependency waits, `Remote task:` links, and each task's Activity: your progress log and the user's comments. It reloads live, so keep local task status current. The board never changes repository files. Change status in the task files, never through the board. It binds to loopback only. Stop it when the user is done.
+On Windows run `scripts\board.cmd` instead. The launcher builds the Rust source in `board/` with `cargo` on first use and then reuses the build. If `cargo` is not on PATH or in `~/.cargo/bin`, the launcher installs a private Rust toolchain with rustup into `~/.cache/smartpowers/rust` (Windows: `%LOCALAPPDATA%\smartpowers\rust`). That is a one-time download of about 450 MB from rust-lang.org, and it leaves PATH, shell profiles, and `~/.cargo` unchanged. On a machine without Rust, tell the user about this download when you launch the board. If the launcher reports a missing C linker, relay its install hint and do not install system packages yourself. Run it in the background (in Claude Code: `run_in_background: true`) and relay the `Smartpowers board: http://localhost:<port>/...` URL it prints. It opens the browser unless `--no-open` is given. The board shows every project's tasks as Linear-style board and list views grouped by `Status:`, the PRD/design/plan approval state, dependency waits, `Remote task:` links, and each task's Activity: your progress log and the user's comments. Its Flow view (`f` key) draws the dependency graph as a flowchart with live status and marks the tasks ready to start as Ready. Add `?view=flow` to a board URL, for example `#/<project-id>?view=flow`, to open that view. The board reloads live, so keep local task status current. The board never changes repository files. Change status in the task files, never through the board. It binds to loopback only. Stop it when the user is done.
 
 ### Board feedback loop
 
@@ -158,14 +158,18 @@ Run independent tasks concurrently with host-native subagents (in Claude Code, t
 **Lead agent**
 
 1. Start the board before dispatching, so subagents can stream progress to it and receive comments.
-2. Run `board next --project <id>`. It reads `tasks/PLAN.md` in order and lists the tasks to start now. A task is ready when it is `Planned` and every dependency is `Done`. It lists the first ready task and the other ready tasks in its parallel group, or, while tasks are running, only ready tasks in their group. A task with no parallel group runs alone. Never start a task it doesn't list.
-3. For each listed task, set `Status: In Progress` in the main checkout and mirror it to Linear if linked. Then launch one subagent per task in the same turn so they run concurrently. Use the brief below. Isolate each subagent in its own git worktree (Claude Code: `isolation: "worktree"`; otherwise `git worktree add`).
+2. List the ready tasks yourself by reading the task files: a task is ready when it has `Status: Planned` and every task in its `Depends on` is `Done`. The board's Flow view marks the same tasks as Ready.
+3. For each ready task, compare its expected code areas with every `In Progress` task.
+   - **Overlap:** hold it in `Planned`, record why with `board log --task <NN>`, and tell the user the plan is missing a dependency between the two tasks.
+   - **No overlap:** set `Status: In Progress` in the main checkout, mirror it to Linear if linked, and launch a subagent for it with the brief below. Isolate each subagent in its own git worktree (Claude Code: `isolation: "worktree"`; otherwise `git worktree add`).
+   - Launch every task you dispatch in this pass in the same turn so they run concurrently.
 4. While subagents run, don't edit files they own, and don't keep an all-tasks listener armed. Each comment then reaches the subagent working on that task.
 5. When a subagent finishes, review its report and merge its branch into the working branch. Then run the task's verification and the repository checks on the merged result.
    - **Success:** set `Status: Done`.
    - **Failure or merge conflict:** set `Status: Blocked`, record why with `board log`, and decide whether to fix the task yourself or dispatch it again.
    - Merging stays local. Pushing still follows [push approval](#push-approval).
-6. Run `board inbox` once for comments on tasks no subagent handled. Then run `board next` again, and repeat until every task is `Done`.
+6. Whenever a task becomes `Done`, run `board inbox` once for comments on tasks no subagent handled, then go back to step 2 right away. Never wait for the other running subagents before starting newly ready tasks.
+7. Stop when every task is `Done`. If no task is ready and none is running, report the `Blocked` tasks, and any you held, to the user.
 
 Only the lead agent edits task status, `PLAN.md`, and Linear, so parallel branches never conflict on them.
 
@@ -173,7 +177,7 @@ Only the lead agent edits task status, `PLAN.md`, and Linear, so parallel branch
 
 - The project ID and the main checkout's absolute path to use as `--root`. Comments, logs, and the board connection are keyed to the main checkout, and a worktree path would point elsewhere.
 - The board launcher path.
-- The task file's path and full text, its dependencies and parallel group, the files it owns, and its verification commands.
+- The task file's path and full text, its dependencies, the files it owns, and its verification commands.
 - These rules:
   1. First, connect to the board by running `board inbox --root <main checkout> --project <id> --task <NN> --wait` in the background. If you can't run background commands, run it without `--wait` after every step.
   2. Stream progress with `board log ... --task <NN> "<message>"` when you start, after each meaningful step, when you're blocked, and when you finish.

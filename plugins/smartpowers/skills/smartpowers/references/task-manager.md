@@ -18,7 +18,7 @@ Create one remote issue per numbered task file. Preserve the local task title an
 
 - objective and scope;
 - covered `REQ-*` and `NFR-*` IDs;
-- dependencies and parallel group;
+- dependencies;
 - verification and acceptance criteria;
 - the repository-relative task-file path as the durable source reference.
 - the Smartpowers project ID so similarly named initiatives remain distinguishable.
