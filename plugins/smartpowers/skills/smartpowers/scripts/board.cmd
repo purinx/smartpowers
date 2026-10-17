@@ -34,14 +34,19 @@ set "PATH=%CARGO_HOME%\bin;%PATH%"
 if exist "%CARGO_HOME%\bin\cargo.exe" exit /b 0
 
 echo cargo not found; installing a private Rust toolchain into %RUST_HOME% ^(one time^)... 1>&2
-set "INSTALLER=%TEMP%\smartpowers-rustup-init-%RANDOM%.exe"
+rem rustup only acts as an installer when its file is named rustup-init.exe,
+rem so make the path unique with a directory, not the file name.
+set "INSTALLER_DIR=%TEMP%\smartpowers-rustup-%RANDOM%%RANDOM%"
+set "INSTALLER=%INSTALLER_DIR%\rustup-init.exe"
+mkdir "%INSTALLER_DIR%" || exit /b 1
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe' -OutFile $env:INSTALLER"
 if errorlevel 1 (
+  rmdir /s /q "%INSTALLER_DIR%" >nul 2>nul
   echo Could not download rustup. Install Rust from https://rustup.rs and try again. 1>&2
   exit /b 1
 )
 "%INSTALLER%" -y -q --no-modify-path --profile minimal --default-toolchain stable --default-host x86_64-pc-windows-gnu 1>&2
 set "STATUS=%errorlevel%"
-del "%INSTALLER%" >nul 2>nul
+rmdir /s /q "%INSTALLER_DIR%" >nul 2>nul
 if not "%STATUS%"=="0" echo Rust toolchain installation failed. Install Rust from https://rustup.rs and try again. 1>&2
 exit /b %STATUS%
