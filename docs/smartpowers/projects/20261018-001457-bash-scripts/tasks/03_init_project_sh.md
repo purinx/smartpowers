@@ -1,6 +1,6 @@
 # 03: init_project.sh
 
-Status: Planned
+Status: Done
 Project: 20261018-001457-bash-scripts
 Requirements: REQ-001, REQ-002
 Depends on: 01
