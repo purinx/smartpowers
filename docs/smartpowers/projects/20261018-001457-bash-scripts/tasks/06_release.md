@@ -1,6 +1,6 @@
 # 06: 0.8.0 のリリース
 
-Status: Planned
+Status: Done
 Project: 20261018-001457-bash-scripts
 Requirements: REQ-010
 Depends on: 05

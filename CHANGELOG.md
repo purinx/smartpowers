@@ -2,6 +2,18 @@
 
 All notable changes to Smartpowers are recorded here. Versions follow [Semantic Versioning](https://semver.org/). Each `## [x.y.z]` section becomes the GitHub release notes for tag `vx.y.z`; see [Releasing](README.md#releasing).
 
+## [0.8.0] - 2026-10-18
+
+### Added
+
+- Small, self-contained work that adds no product feature (a helper script, CI or release tooling, a test-only change) can skip the design doc. Record `Design: Skipped - <reason>` in the PRD; approving the PRD approves the skip, and planning starts from the PRD. The validator accepts it and the board shows the design phase as **Skipped**.
+
+### Changed
+
+- The workflow scripts are bash: `init_project.sh` and `validate_workflow.sh` replace the Python scripts with the same arguments, output, and exit codes. Smartpowers no longer needs `python3`; on Windows the scripts run in Git Bash.
+- A requirement ID written directly next to Japanese text, such as `REQ-001の`, now counts toward traceability. The Python validator missed it.
+- The repository's tests no longer use Python: shell tests run with `bash tests/run.sh`, and the board's end-to-end tests run under `cargo test`.
+
 ## [0.7.0] - 2026-10-17
 
 ### Added
