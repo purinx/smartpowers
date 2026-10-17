@@ -33,7 +33,6 @@ function properties(task) {
     ['Status', [statusIcon(task.statusKey), task.status]],
     ['Requirements', requirements],
     ['Depends on', dependencyChips(task)],
-    ['Parallel group', task.parallelGroup || '—'],
     ['Remote task', remoteValue(task)],
     ['File', el('code', { class: 'mono' }, state.project.path + '/tasks/' + task.file)],
     ['Updated', relativeTime(task.updated)],

@@ -13,7 +13,7 @@ export function waitingOn(task) {
   });
 }
 
-// Waiting dependencies, parallel group, and requirement IDs as chips.
+// Agent, open comments, waiting dependencies, and requirement IDs as chips.
 // `compact` shows at most two requirement IDs plus a "+N" overflow chip.
 export function taskChips(task, compact) {
   const chips = [];
@@ -29,9 +29,6 @@ export function taskChips(task, compact) {
   const waiting = waitingOn(task);
   if (waiting.length) {
     chips.push(el('span', { class: 'chip warn', title: 'Waiting on unfinished dependencies' }, '⧗ ' + waiting.join(', ')));
-  }
-  if (task.parallelGroup) {
-    chips.push(el('span', { class: 'chip', title: 'Parallel group' }, '◇ ' + task.parallelGroup));
   }
   const shown = compact ? task.requirements.slice(0, 2) : task.requirements;
   for (const id of shown) chips.push(el('span', { class: 'chip' }, id));
