@@ -83,9 +83,12 @@ test_reads_crlf_documents_like_lf() {
   valid_project
   local file
   for file in PROJECT.md PRD.md DESIGN_DOC.md tasks/PLAN.md tasks/01_auth.md; do
-    sed 's/$/\r/' "$(project)/$file" >"$TEST_TMP/crlf" && mv "$TEST_TMP/crlf" "$(project)/$file"
+    awk '{ printf "%s\r\n", $0 }' "$(project)/$file" >"$TEST_TMP/crlf"
+    mv "$TEST_TMP/crlf" "$(project)/$file"
   done
-  grep -q $'\r' "$(project)/PRD.md" || fail "the fixture is not CRLF"
+  # Count bytes: Git Bash's sed and grep may hide carriage returns.
+  [ "$(tr -d '\r' <"$(project)/PRD.md" | wc -c)" -lt "$(wc -c <"$(project)/PRD.md")" ] \
+    || fail "the fixture is not CRLF"
   validate implementation
   assert_status 0
 }
