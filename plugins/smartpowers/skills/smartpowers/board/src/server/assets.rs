@@ -39,6 +39,7 @@ const ASSETS: &[Asset] = &[
     asset!("/js/views/header.js", JS),
     asset!("/js/views/list.js", JS),
     asset!("/js/views/panel.js", JS),
+    asset!("/js/views/panel-resize.js", JS),
     asset!("/js/views/sidebar.js", JS),
     asset!("/js/views/task-parts.js", JS),
 ];
