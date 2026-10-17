@@ -17,9 +17,50 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const PROJECTS_PATH: &str = "docs/smartpowers/projects";
 const LOOPBACK_HOSTS: [&str; 4] = ["127.0.0.1", "localhost", "::1", "[::1]"];
-const INDEX_HTML: &str = include_str!("../../assets/board/index.html");
-const APP_CSS: &str = include_str!("../../assets/board/app.css");
-const APP_JS: &str = include_str!("../../assets/board/app.js");
+/// Embed a file from `assets/board` under its URL path.
+macro_rules! asset {
+    ($path:literal, $content_type:expr) => {
+        (
+            $path,
+            $content_type,
+            include_str!(concat!("../../assets/board", $path)),
+        )
+    };
+}
+
+const HTML: &str = "text/html; charset=utf-8";
+const CSS: &str = "text/css; charset=utf-8";
+const JS: &str = "text/javascript; charset=utf-8";
+
+/// Web UI files as (URL path, content type, body). Every file under
+/// `assets/board` must be listed; `embeds_every_asset_file` enforces it.
+const ASSETS: &[(&str, &str, &str)] = &[
+    asset!("/index.html", HTML),
+    asset!("/app.css", CSS),
+    asset!("/js/main.js", JS),
+    asset!("/js/api.js", JS),
+    asset!("/js/dom.js", JS),
+    asset!("/js/live.js", JS),
+    asset!("/js/markdown.js", JS),
+    asset!("/js/router.js", JS),
+    asset!("/js/state.js", JS),
+    asset!("/js/status.js", JS),
+    asset!("/js/views/board.js", JS),
+    asset!("/js/views/content.js", JS),
+    asset!("/js/views/header.js", JS),
+    asset!("/js/views/list.js", JS),
+    asset!("/js/views/panel.js", JS),
+    asset!("/js/views/sidebar.js", JS),
+    asset!("/js/views/task-parts.js", JS),
+];
+
+fn find_asset(path: &str) -> Option<(&'static str, &'static str)> {
+    let path = if path == "/" { "/index.html" } else { path };
+    ASSETS
+        .iter()
+        .find(|(asset_path, _, _)| *asset_path == path)
+        .map(|(_, content_type, body)| (*content_type, *body))
+}
 
 const USAGE: &str = "\
 Usage: smartpowers-board [options]
@@ -731,24 +772,6 @@ fn handle(mut stream: TcpStream, repo_root: &Path, watcher: &Watcher) {
     }
     let path = request.path.as_str();
     match path {
-        "/" | "/index.html" => respond(
-            &mut stream,
-            "200 OK",
-            "text/html; charset=utf-8",
-            INDEX_HTML.as_bytes(),
-        ),
-        "/app.css" => respond(
-            &mut stream,
-            "200 OK",
-            "text/css; charset=utf-8",
-            APP_CSS.as_bytes(),
-        ),
-        "/app.js" => respond(
-            &mut stream,
-            "200 OK",
-            "text/javascript; charset=utf-8",
-            APP_JS.as_bytes(),
-        ),
         "/api/projects" => {
             let repo = repo_root
                 .file_name()
@@ -770,7 +793,12 @@ fn handle(mut stream: TcpStream, repo_root: &Path, watcher: &Watcher) {
                     &Json::Obj(vec![("error", Json::str("Project not found"))]),
                 ),
             },
-            None => respond(&mut stream, "404 Not Found", "text/plain", b"Not found"),
+            None => match find_asset(path) {
+                Some((content_type, body)) => {
+                    respond(&mut stream, "200 OK", content_type, body.as_bytes())
+                }
+                None => respond(&mut stream, "404 Not Found", "text/plain", b"Not found"),
+            },
         },
     }
 }
@@ -990,6 +1018,27 @@ mod tests {
     }
 
     #[test]
+    fn embeds_every_asset_file() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/board");
+        let mut files = Vec::new();
+        files_recursive(&root, &mut files);
+        let mut on_disk: Vec<String> = files
+            .iter()
+            .filter(|p| p.file_name().is_some_and(|n| n != ".DS_Store"))
+            .map(|p| {
+                let relative = p.strip_prefix(&root).unwrap().to_string_lossy();
+                format!("/{}", relative.replace('\\', "/"))
+            })
+            .collect();
+        let mut embedded: Vec<String> = ASSETS.iter().map(|(p, _, _)| p.to_string()).collect();
+        on_disk.sort();
+        embedded.sort();
+        assert_eq!(on_disk, embedded, "update ASSETS to match assets/board");
+        assert_eq!(find_asset("/").map(|(t, _)| t), Some(HTML));
+        assert!(find_asset("/../Cargo.toml").is_none());
+    }
+
+    #[test]
     fn validates_ids_and_task_names() {
         assert!(is_project_id(PROJECT_ID));
         assert!(!is_project_id("../etc"));
@@ -1056,7 +1105,7 @@ mod tests {
         let projects = get(port, "/api/projects", "");
         assert!(projects.starts_with("HTTP/1.1 200"));
         assert!(projects.contains(PROJECT_ID));
-        assert!(get(port, "/", "").contains("app.js"));
+        assert!(get(port, "/", "").contains("js/main.js"));
         assert!(get(port, "/api/projects/nope", "").starts_with("HTTP/1.1 404"));
         assert!(get(port, "/api/projects", "Host: evil.example\r\n").starts_with("HTTP/1.1 403"));
         assert!(
