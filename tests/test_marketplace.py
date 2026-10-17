@@ -37,6 +37,16 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(codex["description"], claude["description"])
         self.assertTrue((ROOT / "plugins/smartpowers/skills").is_dir())
 
+    def test_board_crate_version_matches_plugin(self) -> None:
+        plugin = load("plugins/smartpowers/.claude-plugin/plugin.json")
+        board = ROOT / "plugins/smartpowers/skills/smartpowers/board"
+        expected = f'version = "{plugin["version"]}"'
+
+        manifest = (board / "Cargo.toml").read_text(encoding="utf-8")
+        self.assertIn(expected, manifest.splitlines())
+        lock = (board / "Cargo.lock").read_text(encoding="utf-8")
+        self.assertIn(f'name = "smartpowers-board"\n{expected}', lock)
+
 
 if __name__ == "__main__":
     unittest.main()
