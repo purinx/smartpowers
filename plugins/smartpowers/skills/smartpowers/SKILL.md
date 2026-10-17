@@ -67,9 +67,9 @@ Within the selected project only, inspect `PROJECT.md`, `PRD.md`, `DESIGN_DOC.md
 Resume at the earliest incomplete gate:
 
 1. Requirements: PRD missing or `Status: Draft`.
-2. Design: PRD approved, design missing or `Status: Draft`.
-3. Planning: design approved, task structure not agreed, or plan missing/draft.
-4. Implementation: PRD, design, and task plan approved.
+2. Design: PRD approved, design missing or `Status: Draft`, unless the PRD records `Design: Skipped` (see [skipping the design](#skipping-the-design)).
+3. Planning: design approved or skipped, task structure not agreed, or plan missing/draft.
+4. Implementation: PRD, design (or its approved skip), and task plan approved.
 
 If selected-project artifacts conflict, repair the earliest affected phase. Never use another project's artifact to fill a gap, and never silently rewrite an approved upstream artifact.
 
@@ -97,9 +97,15 @@ Start from the selected project's approved PRD. Ask for technology preferences a
 
 Create `<project-root>/DESIGN_DOC.md` from [the design guide](references/design.md). Map every PRD requirement to concrete design sections and a verification approach.
 
+### Skipping the design
+
+Skip `DESIGN_DOC.md` for small, self-contained work that adds no product feature: a helper or maintenance script, CI or release tooling, a test-only change. Never skip it when the work changes user-facing behavior, data formats, interfaces, security, or architecture, or when it requires choosing between real technical alternatives.
+
+To skip, add `Design: Skipped - <one-line reason>` below `Status:` in the PRD header and say so in the PRD review summary. Approving the PRD approves the skip. Then go straight to planning: tasks trace requirements to the PRD, and `PLAN.md` records the few technical decisions the work needs. If the work outgrows these criteria, remove the field, write the design, and get it approved before continuing.
+
 ## Phase 3: implementation planning
 
-Start from the selected project's approved design. First show task titles, boundaries, dependency order, affected repository areas, and safe parallel groups. Create no task files until the user agrees to that granularity and order.
+Start from the selected project's approved design, or from its approved PRD when the design is skipped. First show task titles, boundaries, dependency order, affected repository areas, and safe parallel groups. Create no task files until the user agrees to that granularity and order.
 
 Then create `<project-root>/tasks/PLAN.md` and numbered task files using [the planning guide](references/planning.md), and run the detailed-plan approval protocol. After approval, use [the task-manager guide](references/task-manager.md) when Linear or an equivalent tool is available. Require the target remote project and final mapping before remote writes.
 

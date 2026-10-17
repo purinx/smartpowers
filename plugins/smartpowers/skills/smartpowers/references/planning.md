@@ -1,6 +1,8 @@
 # Implementation planning guide
 
-Use this guide only after the design is approved and the user agrees to the proposed granularity and execution order.
+Use this guide only after the design is approved (or skipped in the approved PRD) and the user agrees to the proposed granularity and execution order.
+
+When the PRD records `Design: Skipped`, write `Design: Skipped (see ../PRD.md)` in the plan header instead of the design link, and add a short `## Technical decisions` section after `## Delivery strategy`.
 
 ## Plan index
 

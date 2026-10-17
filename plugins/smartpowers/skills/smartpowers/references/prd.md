@@ -56,3 +56,13 @@ Project: YYYYMMDD-HHMMSS-slug
 - Keep future ideas out of scope unless the first release depends on them.
 
 Before review, confirm that the document captures the user's stated objective, each requirement is testable, and no open question prevents meaningful approval.
+
+## Skipping the design
+
+For small, self-contained work that adds no product feature (see [skipping the design](../SKILL.md#skipping-the-design)), add this field below `Status:`:
+
+```markdown
+Design: Skipped - helper script with no user-facing behavior
+```
+
+Mention the skip in the review summary; approving the PRD approves it.
