@@ -79,12 +79,31 @@ pub fn requirement_ids(text: &str) -> Vec<String> {
     found.into_iter().collect()
 }
 
-/// Two-digit task references such as `01, 02`.
+/// Two-digit task references such as `01, 02`, `Task 01`, or a link to a
+/// task file such as `[left](02_left.md)`, deduplicated in first-seen order.
+/// Matches `task_refs` in `validate_workflow.sh`.
 pub fn task_refs(text: &str) -> Vec<String> {
-    text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
-        .filter(|token| token.len() == 2 && token.bytes().all(|b| b.is_ascii_digit()))
-        .map(str::to_string)
-        .collect()
+    let bytes = text.as_bytes();
+    let mut refs: Vec<String> = Vec::new();
+    let mut start = 0;
+    while start < bytes.len() {
+        if !is_word(bytes[start]) {
+            start += 1;
+            continue;
+        }
+        let end = start + bytes[start..].iter().take_while(|b| is_word(**b)).count();
+        let token = &bytes[start..end];
+        let two_digits = token.len() >= 2 && token[..2].iter().all(u8::is_ascii_digit);
+        let task_file = token.len() >= 3 && token[2] == b'_' && bytes[end..].starts_with(b".md");
+        if two_digits && (token.len() == 2 || task_file) {
+            let number = text[start..start + 2].to_string();
+            if !refs.contains(&number) {
+                refs.push(number);
+            }
+        }
+        start = end;
+    }
+    refs
 }
 
 /// The first http(s) URL, ending at whitespace or a closing bracket.
@@ -150,6 +169,10 @@ mod tests {
             ["NFR-001", "REQ-002"]
         );
         assert_eq!(task_refs("01, 02 and 103"), ["01", "02"]);
+        assert_eq!(
+            task_refs("[left](02_left.md), Task 03, [04](04_x.md), 05_no"),
+            ["02", "03", "04"]
+        );
         assert_eq!(find_url("ENG-1 (https://a.b/c) x"), Some("https://a.b/c"));
         assert_eq!(
             find_issue_key("see ENG-42 https://x/ENG-42"),
