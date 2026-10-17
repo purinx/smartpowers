@@ -111,6 +111,17 @@ Keep task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. When t
 
 If implementation reveals a material requirement or architecture change, return the selected project to the earliest impacted approval gate. After all tasks pass their checks and repository-level verification, set `PROJECT.md` to `Status: Completed`, add `Completed: <ISO-8601 timestamp>`, and report delivered requirements and residual risks.
 
+## Push approval
+
+Never push without the user's explicit approval of the exact commits being pushed. Committing locally needs no such approval. To request a push:
+
+1. Run `git fetch` and list the unpushed commits with `git log --oneline <upstream>..HEAD`. If the branch has no upstream, compare against the remote default branch.
+2. If Crit is installed (`command -v crit`), present the commit log and diff in Crit with `crit --range <upstream>..HEAD`. Follow the Crit review loop: run it in the background, relay the URL it prints, and wait for the user to finish the review. Tell the user that finishing with no comments approves the push.
+3. If the review has comments, address them in new commits or by rewriting the unpushed commits, then reopen Crit on the updated range. Push only after a round finishes with `approved: true`.
+4. If Crit is unavailable, show the commit log and `git diff --stat <upstream>..HEAD` in chat, offer the full diff, and ask for explicit approval.
+
+Approval covers only the range shown. If commits are added or rewritten after approval, request approval again. Never force-push unless the user asks for it.
+
 ## Progress board
 
 When the user asks to see progress in the browser, or at the start of implementation if they want to watch it, launch the read-only progress board:
