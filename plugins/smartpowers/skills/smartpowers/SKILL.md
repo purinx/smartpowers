@@ -111,6 +111,17 @@ Keep task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. When t
 
 If implementation reveals a material requirement or architecture change, return the selected project to the earliest impacted approval gate. After all tasks pass their checks and repository-level verification, set `PROJECT.md` to `Status: Completed`, add `Completed: <ISO-8601 timestamp>`, and report delivered requirements and residual risks.
 
+## Progress board
+
+When the user asks to see progress in the browser, or at the start of implementation if they want to watch it, launch the read-only progress board:
+
+```bash
+<plugin-root>/skills/smartpowers/scripts/board \
+  --root <repo-root> --project <project-id>
+```
+
+On Windows run `scripts\board.cmd` instead. The launcher builds the Rust source in `board/` with `cargo` on first use, which may take a few seconds, and then reuses the build. If it reports that `cargo` is missing, tell the user the board needs the Rust toolchain from https://rustup.rs. Do not install it yourself. Run it in the background (in Claude Code: `run_in_background: true`) and relay the `Smartpowers board: http://localhost:<port>/...` URL it prints. It opens the browser unless `--no-open` is given. The board shows every project's tasks as Linear-style board and list views grouped by `Status:`, the PRD/design/plan approval state, dependency waits, and `Remote task:` links. It reloads live as task files change, so keep local task status current. The board only reads files. Change status in the task files, never through the board. It binds to loopback only. Stop it when the user is done.
+
 ## Mechanical validation
 
 List project workspaces:

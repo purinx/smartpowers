@@ -1,0 +1,2 @@
+*.cmd text eol=crlf
+plugins/smartpowers/skills/smartpowers/scripts/board text eol=lf

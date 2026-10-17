@@ -1,0 +1,22 @@
+#!/bin/sh
+# Build (on first run and after plugin updates) and launch the Smartpowers progress board.
+# Windows: use board.cmd.
+set -eu
+
+skill_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+manifest="$skill_root/board/Cargo.toml"
+bin="$skill_root/board/target/release/smartpowers-board"
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "The Smartpowers board is built from source and needs the Rust toolchain." >&2
+  echo "Install Rust from https://rustup.rs, then run this command again." >&2
+  exit 1
+fi
+
+if [ ! -x "$bin" ]; then
+  echo "Building the Smartpowers board (first run only)..." >&2
+fi
+# A no-op when the binary is already up to date with the source.
+cargo build --release --quiet --manifest-path "$manifest"
+
+exec "$bin" "$@"

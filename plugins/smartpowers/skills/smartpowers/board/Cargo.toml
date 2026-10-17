@@ -1,0 +1,18 @@
+[package]
+name = "smartpowers-board"
+version = "0.3.0"
+edition = "2021"
+description = "Read-only, Linear-style progress board for Smartpowers projects"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "smartpowers-board"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

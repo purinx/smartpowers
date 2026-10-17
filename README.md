@@ -29,9 +29,34 @@ Starting another initiative creates another timestamped directory, even when it 
 plugins/smartpowers/.codex-plugin/plugin.json     Codex plugin manifest
 plugins/smartpowers/.claude-plugin/plugin.json    Claude Code plugin manifest
 plugins/smartpowers/skills/smartpowers/SKILL.md   shared workflow
+plugins/smartpowers/skills/smartpowers/assets/board/  progress board web UI
+plugins/smartpowers/skills/smartpowers/board/         progress board server (Rust source)
 ```
 
 Both marketplaces expose the plugin as `smartpowers@smartpowers`.
+
+## Progress board
+
+> [!NOTE]
+> The board is built from source on your machine, so it needs the [Rust toolchain](https://rustup.rs) (`cargo`). No prebuilt binaries are shipped. The rest of the Smartpowers workflow does not need Rust.
+>
+> The board is tested on **macOS only**. It uses only the Rust standard library and should build on Linux and Windows, but neither has been verified yet.
+>
+> **Contributions welcome!** Reports or fixes from Linux and Windows users are especially appreciated, as is CI that builds and tests the board on all three platforms. See [Develop with Claude Code](#develop-with-claude-code) for local setup.
+
+Ask the agent to "show the Smartpowers board", or run it yourself:
+
+```bash
+# macOS / Linux
+plugins/smartpowers/skills/smartpowers/scripts/board --root <repo-root>
+
+# Windows
+plugins\smartpowers\skills\smartpowers\scripts\board.cmd --root <repo-root>
+```
+
+The board server is a single Rust program with the web UI embedded, using only the standard library (no third-party crates). The first launch compiles it with `cargo build --release` into `board/target/`, which takes a few seconds. Later launches reuse that build and recompile only after a plugin update changes the source. Run the board's tests with `cargo test --manifest-path plugins/smartpowers/skills/smartpowers/board/Cargo.toml`.
+
+It starts a local, read-only server on `127.0.0.1` and opens a Linear-style board in your browser. You get board and list views per project grouped by task status, the approval state of each phase, overall progress, dependency waits, and links to remote issues. The page updates live whenever task files change, so you can watch implementation progress as the agent works. Keyboard: `b` board, `l` list, `/` filter, `Esc` close. Options: `--project <id>`, `--port <n>`, `--no-open`.
 
 ## Install from GitHub
 

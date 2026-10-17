@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smartpowers Board</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%235e6ad2'/%3E%3Cpath d='M4.5 8.2l2.3 2.3 4.7-5' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="workspace">
+        <span class="workspace-logo">S</span>
+        <span class="workspace-name" id="repo-name">Smartpowers</span>
+      </div>
+      <div class="nav-label">Projects</div>
+      <nav id="project-nav" class="project-nav"></nav>
+      <div class="sidebar-footer">
+        <span id="live" class="live" title="Live updates">
+          <span class="live-dot"></span><span id="live-text">Connecting…</span>
+        </span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="crumbs">
+          <span class="crumb-muted">Projects</span>
+          <span class="crumb-sep">›</span>
+          <span id="crumb-title" class="crumb-title">—</span>
+        </div>
+        <div class="toolbar">
+          <input id="filter" class="filter" type="search" placeholder="Filter tasks  /" autocomplete="off">
+          <div class="segmented" role="tablist">
+            <button data-view="board" role="tab" title="Board (b)">Board</button>
+            <button data-view="list" role="tab" title="List (l)">List</button>
+          </div>
+        </div>
+      </header>
+
+      <section id="project-header" class="project-header" hidden>
+        <div class="project-meta">
+          <h1 id="project-title"></h1>
+          <div class="project-sub">
+            <span id="project-status" class="pill"></span>
+            <code id="project-id" class="mono muted"></code>
+          </div>
+        </div>
+        <div class="project-side">
+          <div id="phases" class="phases"></div>
+          <div class="progress">
+            <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+            <span id="progress-text" class="muted"></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="content" class="content"></section>
+    </main>
+
+    <aside id="panel" class="panel" hidden>
+      <div class="panel-head">
+        <span id="panel-id" class="mono muted"></span>
+        <button id="panel-close" class="icon-btn" title="Close (Esc)">✕</button>
+      </div>
+      <div class="panel-scroll">
+        <h2 id="panel-title" class="panel-title"></h2>
+        <dl id="panel-props" class="props"></dl>
+        <article id="panel-body" class="markdown"></article>
+      </div>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
