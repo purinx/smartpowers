@@ -1,12 +1,18 @@
 // Shared UI state. main.js and the router change it; views only read it.
 
+export const VIEWS = ['board', 'list', 'flow'];
+
+export function isView(value) {
+  return VIEWS.includes(value);
+}
+
 export const state = {
   repo: '',
   projects: [],
   project: null,
   projectId: null,
   taskNumber: null,
-  view: readPref('view') || 'board',
+  view: isView(readPref('view')) ? readPref('view') : 'board',
   filter: '',
   // `${projectId}/${number}` -> `${statusKey}|${updated}` from the last render,
   // used to flash tasks that changed since then.

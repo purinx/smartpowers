@@ -1,21 +1,22 @@
-// Main content area: empty states, or the board/list for the filtered tasks.
+// Main content area: empty states, or the board, list, or flow for the filtered tasks.
 
 import { byId, el } from '../dom.js';
 import { state } from '../state.js';
 import { renderBoard } from './board.js';
+import { renderFlow } from './flow.js';
 import { renderList } from './list.js';
 
 function emptyState(title, detail) {
   return el('div', { class: 'empty' }, [el('h3', null, title), el('div', null, detail)]);
 }
 
-// Case-insensitive match on number, title, status, group, remote key, and requirement IDs.
+// Case-insensitive match on number, title, status, remote key, and requirement IDs.
 function filteredTasks() {
   const query = state.filter.trim().toLowerCase();
   const tasks = state.project.tasks;
   if (!query) return tasks;
   return tasks.filter((task) => [
-    task.number, task.title, task.status, task.parallelGroup, task.remote?.key ?? '', ...task.requirements,
+    task.number, task.title, task.status, task.remote?.key ?? '', ...task.requirements,
   ].join(' ').toLowerCase().includes(query));
 }
 
@@ -28,7 +29,9 @@ function contentNode() {
     return emptyState('No tasks yet', 'Tasks appear after the implementation plan creates tasks/NN_*.md files.');
   }
   const tasks = filteredTasks();
-  return state.view === 'list' ? renderList(tasks) : renderBoard(tasks);
+  if (state.view === 'list') return renderList(tasks);
+  if (state.view === 'flow') return renderFlow(tasks, state.project.graphIssues || []);
+  return renderBoard(tasks);
 }
 
 export function renderContent() {

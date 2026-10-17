@@ -162,6 +162,32 @@ button, input, textarea { font: inherit; color: inherit; }
 .remote-key:hover { text-decoration: underline; }
 .column-empty { padding: 12px 6px; color: var(--text-3); font-size: 12px; }
 
+/* Flow: dependency graph. Node size and gaps match js/views/flow.js. */
+.flow { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 240px; }
+.flow-issues { flex: none; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--progress) 45%, var(--border)); border-radius: var(--radius); background: var(--bg-elev); color: var(--text); }
+.flow-issues-title { display: flex; gap: 8px; align-items: center; font-weight: 600; color: var(--progress); }
+.flow-issues ul { margin: 4px 0 0; padding-left: 24px; color: var(--text-2); }
+.flow-scroll { flex: 1; min-height: 0; overflow: auto; background: var(--bg-side); border-radius: 10px; }
+.flow-canvas { position: relative; }
+.flow-edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+.flow-edge { fill: none; stroke-width: 1.5; }
+.flow-edge.done { stroke: var(--text-3); }
+.flow-edge.pending { stroke: var(--accent-text); stroke-dasharray: 5 4; }
+.flow-arrow.done path { fill: var(--text-3); }
+.flow-arrow.pending path { fill: var(--accent-text); }
+.flow-node { position: absolute; width: 232px; height: 76px; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; overflow: hidden; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); cursor: pointer; transition: border-color .15s; }
+.flow-node:hover { border-color: var(--border-strong); }
+.flow-node.selected { border-color: var(--accent); }
+.flow-node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.flow-node-top { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; }
+.flow-node-number { flex: none; color: var(--text-3); }
+.flow-node-status { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-size: 11px; color: var(--text-2); }
+.flow-node-status > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-node-status + .chip { margin-left: auto; }
+.flow-node .chip { flex: none; height: 18px; }
+.flow-node-title { font-weight: 500; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
+.chip.ready { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); font-weight: 600; }
+
 /* List */
 .group { margin-top: 12px; }
 .group-head { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--bg-side); border-radius: 6px; font-weight: 500; }
