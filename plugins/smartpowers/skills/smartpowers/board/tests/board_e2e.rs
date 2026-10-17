@@ -133,36 +133,15 @@ fn subagent_receives_comments_live() {
 }
 
 #[test]
-fn next_lists_parallel_tasks_in_plan_order() {
+fn next_is_no_longer_a_command() {
     let repo = TempRepo::new();
-    repo.write(
-        "tasks/01_infra_foundations.md",
-        &format!(
-            "# 01: Infrastructure foundations\n\nStatus: Done\nProject: {PROJECT_ID}\n\
-             Depends on: None\n"
-        ),
+    let output = repo.board(&["next"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        stderr(&output).contains("Unexpected argument: next"),
+        "{}",
+        stderr(&output)
     );
-    for (number, name) in [("02", "domain"), ("03", "api")] {
-        repo.write(
-            &format!("tasks/{number}_{name}.md"),
-            &format!(
-                "# {number}: {name}\n\nStatus: Planned\nProject: {PROJECT_ID}\n\
-                 Depends on: 01\nParallel group: B\n"
-            ),
-        );
-    }
-    repo.write(
-        "tasks/PLAN.md",
-        "| 01 | [a](01_infra_foundations.md) |\n| 03 | [c](03_api.md) |\n| 02 | [b](02_domain.md) |\n",
-    );
-
-    let result = repo.board(&["next"]);
-    assert!(result.status.success(), "{}", stderr(&result));
-    let text = stdout(&result);
-    assert!(text.contains("Start now"), "{text}");
-    let api = text.find("03  api").expect(&text);
-    let domain = text.find("02  domain").expect(&text);
-    assert!(api < domain, "{text}");
 }
 
 #[test]

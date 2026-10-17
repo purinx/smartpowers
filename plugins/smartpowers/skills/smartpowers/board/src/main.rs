@@ -6,7 +6,7 @@
 //!
 //! Modules:
 //! - `cli`        command-line parsing and browser launching
-//! - `agent`      `next`, `inbox`, `reply`, and `log` commands for coding agents
+//! - `agent`      `inbox`, `reply`, and `log` commands for coding agents
 //! - `client`     HTTP client those commands use to reach a running board
 //! - `runtime`    the running board's address and agent token
 //! - `project`    projects and tasks, plus their comments and logs
@@ -55,7 +55,6 @@ fn main() -> ExitCode {
     };
     let result = open_workspace(&invocation.root).and_then(|workspace| match &invocation.command {
         Command::Serve(options) => serve(workspace, options),
-        Command::Next(options) => agent::next(&workspace, options),
         Command::Inbox(options) => agent::inbox(&workspace, options),
         Command::Reply(options) => agent::reply(&workspace, options),
         Command::Log(options) => agent::log(&workspace, options),
