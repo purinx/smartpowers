@@ -239,13 +239,70 @@ pub fn create(
     Ok(comment)
 }
 
+/// Pending user comments, optionally for one task, oldest first.
+pub fn pending(project_state: &Path, task: Option<&str>) -> Vec<Comment> {
+    load(project_state)
+        .into_iter()
+        .filter(|comment| comment.is_pending() && task.is_none_or(|task| comment.task == task))
+        .collect()
+}
+
+/// Mark a comment delivered. It is re-read first so a concurrent change,
+/// such as an agent resolving it, is never overwritten.
+pub fn mark_delivered(project_state: &Path, id: &str) -> Result<(), String> {
+    match find(project_state, id) {
+        Some(mut comment) if !comment.delivered => {
+            comment.delivered = true;
+            save(project_state, &comment)
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Reply as the agent on the thread containing `id`. Replies attach to the
+/// thread's first comment, and `resolve` marks that thread addressed.
+/// Returns the thread's first comment and the new reply.
+pub fn reply(
+    project_state: &Path,
+    id: &str,
+    body: &str,
+    resolve: bool,
+) -> Result<(Comment, Comment), String> {
+    let target = find(project_state, id).ok_or_else(|| format!("Comment not found: {id}"))?;
+    let mut root = match &target.reply_to {
+        Some(root_id) => {
+            find(project_state, root_id).ok_or_else(|| format!("Comment not found: {root_id}"))?
+        }
+        None => target,
+    };
+    let reply = create(
+        project_state,
+        &root.task,
+        Author::Agent,
+        body,
+        Some(&root.id),
+    )?;
+    root.delivered = true;
+    if resolve {
+        root.status = CommentStatus::Addressed;
+    }
+    save(project_state, &root)?;
+    Ok((root, reply))
+}
+
 /// Write a comment atomically (temp file, then rename) so the board and
 /// agents never read a half-written file.
 pub fn save(project_state: &Path, comment: &Comment) -> Result<(), String> {
+    static WRITES: AtomicU64 = AtomicU64::new(0);
     let path = path_for(project_state, &comment.task, &comment.id);
     let dir = path.parent().ok_or("invalid comment path")?;
     fs::create_dir_all(dir).map_err(|error| format!("cannot create {}: {error}", dir.display()))?;
-    let temp = path.with_extension("md.tmp");
+    // Unique per write, so concurrent saves of one comment never share a temp file.
+    let temp = path.with_extension(format!(
+        "md.{}-{}.tmp",
+        std::process::id(),
+        WRITES.fetch_add(1, Ordering::Relaxed)
+    ));
     fs::write(&temp, comment.render())
         .and_then(|()| fs::rename(&temp, &path))
         .map_err(|error| format!("cannot write {}: {error}", path.display()))
@@ -315,5 +372,35 @@ mod tests {
         assert!(create(&state, "02", Author::User, " \n ", None).is_err());
         let long = "x".repeat(MAX_BODY_CHARS + 1);
         assert!(create(&state, "02", Author::User, &long, None).is_err());
+    }
+
+    #[test]
+    fn filters_pending_delivers_and_replies_on_the_thread_root() {
+        let repo = TempRepo::new();
+        let state = repo.project_state();
+        let on_01 = create(&state, "01", Author::User, "First", None).unwrap();
+        let on_02 = create(&state, "02", Author::User, "Second", None).unwrap();
+        assert_eq!(pending(&state, None).len(), 2);
+        let only_02: Vec<_> = pending(&state, Some("02"))
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        assert_eq!(only_02, std::slice::from_ref(&on_02.id));
+
+        mark_delivered(&state, &on_01.id).unwrap();
+        assert_eq!(pending(&state, None).len(), 1);
+
+        let (root, first_reply) = reply(&state, &on_02.id, "On it", false).unwrap();
+        assert_eq!(root.status, CommentStatus::Open);
+        // Replying to a reply still attaches to, and resolves, the root.
+        let (root, second_reply) = reply(&state, &first_reply.id, "Done", true).unwrap();
+        assert_eq!(root.id, on_02.id);
+        assert_eq!(second_reply.reply_to.as_deref(), Some(on_02.id.as_str()));
+        assert_eq!(
+            find(&state, &on_02.id).unwrap().status,
+            CommentStatus::Addressed
+        );
+        assert!(pending(&state, None).is_empty());
+        assert!(reply(&state, "20990101-000000-0000", "x", false).is_err());
     }
 }

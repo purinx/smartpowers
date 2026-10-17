@@ -1,19 +1,25 @@
 //! HTTP server: one thread per connection, loopback only.
 //!
-//! Routes:
+//! Web UI routes (writes require a loopback `Origin`):
 //! - `GET  /api/projects`                          project list (sidebar)
 //! - `GET  /api/projects/<id>`                     one project with phases and tasks
 //! - `POST /api/projects/<id>/tasks/<n>/comments`  add a comment (text/plain body)
 //! - `GET  /api/events`                            Server-Sent Events on changes
 //! - `GET  anything else`                          embedded web UI files
 //!
-//! Adding comments is the only write. It goes to the state directory, never
-//! to the repository.
+//! Agent routes (require `Authorization: Bearer <token>` from
+//! `<state dir>/board-server`):
+//! - `GET  /api/agent/projects/<id>/events[?task=<n>]`        comments as SSE
+//! - `POST /api/agent/projects/<id>/tasks/<n>/log`            progress entry
+//! - `POST /api/agent/projects/<id>/comments/<c>/reply[?resolve=1]`
+//!
+//! Every write goes to the state directory, never to the repository.
 
 mod api;
 mod assets;
 mod events;
 mod http;
+mod hub;
 
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
@@ -21,22 +27,41 @@ use std::thread;
 use std::time::Duration;
 
 use crate::project::comments::{self, Author};
-use crate::project::{self, load_project};
+use crate::project::{self, load_project, log, Project};
 use crate::watcher::Watcher;
 use crate::workspace::Workspace;
 pub use http::is_loopback;
 use http::{Request, Response};
+use hub::Hub;
 
-/// Accept connections forever.
-pub fn serve(listener: TcpListener, workspace: Arc<Workspace>, watcher: Arc<Watcher>) {
-    for stream in listener.incoming().flatten() {
-        let workspace = Arc::clone(&workspace);
-        let watcher = Arc::clone(&watcher);
-        thread::spawn(move || handle(stream, &workspace, &watcher));
+/// Everything request handlers share.
+pub struct Context {
+    pub workspace: Arc<Workspace>,
+    pub watcher: Arc<Watcher>,
+    hub: Hub,
+    token: String,
+}
+
+impl Context {
+    pub fn new(workspace: Arc<Workspace>, watcher: Arc<Watcher>, token: String) -> Self {
+        Context {
+            hub: Hub::new(Arc::clone(&watcher)),
+            workspace,
+            watcher,
+            token,
+        }
     }
 }
 
-fn handle(mut stream: TcpStream, workspace: &Workspace, watcher: &Watcher) {
+/// Accept connections forever.
+pub fn serve(listener: TcpListener, context: Arc<Context>) {
+    for stream in listener.incoming().flatten() {
+        let context = Arc::clone(&context);
+        thread::spawn(move || handle(stream, &context));
+    }
+}
+
+fn handle(mut stream: TcpStream, context: &Context) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
     let Some(request) = http::read_request(&stream) else {
         return;
@@ -44,22 +69,34 @@ fn handle(mut stream: TcpStream, workspace: &Workspace, watcher: &Watcher) {
     if !request.is_trusted() {
         return Response::text("403 Forbidden", "Forbidden").send(&mut stream);
     }
-    match request.method.as_str() {
-        "GET" if request.path == "/api/events" => events::stream(&mut stream, watcher),
-        "GET" => get(&request.path, workspace).send(&mut stream),
-        "POST" => post(&request, workspace).send(&mut stream),
+    let path = request.path.clone();
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    if let ["api", "agent", rest @ ..] = parts.as_slice() {
+        return agent(&request, rest, context, &mut stream);
+    }
+    match (request.method.as_str(), parts.as_slice()) {
+        ("GET", ["api", "events"]) => events::stream(&mut stream, &context.watcher),
+        ("GET", _) => get(&request.path, context).send(&mut stream),
+        ("POST", ["api", "projects", id, "tasks", task, "comments"]) => {
+            post_comment(&request, id, task, context).send(&mut stream)
+        }
+        ("POST", _) => Response::text("404 Not Found", "Not found").send(&mut stream),
         _ => Response::text("405 Method Not Allowed", "Method not allowed").send(&mut stream),
     }
 }
 
-fn get(path: &str, workspace: &Workspace) -> Response {
+fn get(path: &str, context: &Context) -> Response {
+    let workspace = &context.workspace;
     if path == "/api/projects" {
         let projects = project::list_projects(workspace);
         return Response::json("200 OK", &api::projects(&workspace.repo_name(), &projects));
     }
     if let Some(id) = path.strip_prefix("/api/projects/") {
         return match load_project(workspace, id) {
-            Some(project) => Response::json("200 OK", &api::project(&project)),
+            Some(project) => {
+                let listeners = context.hub.listeners(id);
+                Response::json("200 OK", &api::project(&project, &listeners))
+            }
             None => not_found("Project not found"),
         };
     }
@@ -69,36 +106,104 @@ fn get(path: &str, workspace: &Workspace) -> Response {
     }
 }
 
-fn post(request: &Request, workspace: &Workspace) -> Response {
+fn post_comment(request: &Request, id: &str, task: &str, context: &Context) -> Response {
+    // Browsers send Origin on every POST; its absence means a non-browser
+    // client, which must use the token-protected agent API instead.
     if !request.has_origin() {
         return Response::text("403 Forbidden", "Forbidden");
     }
-    let Some((id, task)) = comment_target(&request.path) else {
-        return Response::text("404 Not Found", "Not found");
+    let (_, body) = match target(request, id, Some(task), context) {
+        Ok(found) => found,
+        Err(response) => return response,
     };
-    let Some(project) = load_project(workspace, id) else {
-        return not_found("Project not found");
-    };
-    if !project.tasks.iter().any(|t| t.number == task) {
-        return not_found("Task not found");
-    }
-    if request.body_too_large {
-        return Response::json("413 Payload Too Large", &api::error("Comment is too long"));
-    }
-    let Ok(body) = std::str::from_utf8(&request.body) else {
-        return bad_request("Comment must be UTF-8 text");
-    };
-    match comments::create(&workspace.project_state(id), task, Author::User, body, None) {
-        Ok(comment) => Response::json("201 Created", &api::comment(&comment)),
+    match comments::create(
+        &context.workspace.project_state(id),
+        task,
+        Author::User,
+        body,
+        None,
+    ) {
+        Ok(comment) => {
+            context.hub.publish(id, &comment);
+            Response::json("201 Created", &api::comment(&comment))
+        }
         Err(message) => bad_request(&message),
     }
 }
 
-/// `/api/projects/<id>/tasks/<n>/comments` -> `(id, n)`.
-fn comment_target(path: &str) -> Option<(&str, &str)> {
-    let (id, rest) = path.strip_prefix("/api/projects/")?.split_once('/')?;
-    let task = rest.strip_prefix("tasks/")?.strip_suffix("/comments")?;
-    Some((id, task))
+fn agent(request: &Request, parts: &[&str], context: &Context, stream: &mut TcpStream) {
+    let expected = format!("Bearer {}", context.token);
+    if request.header("authorization") != Some(expected.as_str()) {
+        return Response::json(
+            "401 Unauthorized",
+            &api::error("Missing or wrong board token"),
+        )
+        .send(stream);
+    }
+    let state = |id: &str| context.workspace.project_state(id);
+    let response = match (request.method.as_str(), parts) {
+        ("GET", ["projects", id, "events"]) => {
+            let task = request.query_param("task");
+            return match target(request, id, task, context) {
+                Ok((project, _)) => {
+                    events::agent_stream(stream, &context.hub, &state(id), &project, task)
+                }
+                Err(response) => response.send(stream),
+            };
+        }
+        ("POST", ["projects", id, "tasks", task, "log"]) => {
+            match target(request, id, Some(task), context) {
+                Ok((_, body)) => match log::append(&state(id), task, body) {
+                    Ok(entry) => Response::json("201 Created", &api::log_entry(&entry)),
+                    Err(message) => bad_request(&message),
+                },
+                Err(response) => response,
+            }
+        }
+        ("POST", ["projects", id, "comments", comment, "reply"]) => {
+            match target(request, id, None, context) {
+                Ok((_, body)) => {
+                    let resolve = request.query_param("resolve") == Some("1");
+                    match comments::reply(&state(id), comment, body, resolve) {
+                        Ok((_, reply)) => Response::json("201 Created", &api::comment(&reply)),
+                        Err(message) if message.starts_with("Comment not found") => {
+                            not_found(&message)
+                        }
+                        Err(message) => bad_request(&message),
+                    }
+                }
+                Err(response) => response,
+            }
+        }
+        _ => Response::text("404 Not Found", "Not found"),
+    };
+    response.send(stream);
+}
+
+/// Resolve the project (and task, when given) a request targets, and its
+/// UTF-8 body. Errors come back as the response to send.
+fn target<'r>(
+    request: &'r Request,
+    id: &str,
+    task: Option<&str>,
+    context: &Context,
+) -> Result<(Project, &'r str), Response> {
+    let project =
+        load_project(&context.workspace, id).ok_or_else(|| not_found("Project not found"))?;
+    if let Some(task) = task {
+        if !project.tasks.iter().any(|t| t.number == task) {
+            return Err(not_found("Task not found"));
+        }
+    }
+    if request.body_too_large {
+        return Err(Response::json(
+            "413 Payload Too Large",
+            &api::error("Request body is too large"),
+        ));
+    }
+    let body =
+        std::str::from_utf8(&request.body).map_err(|_| bad_request("Body must be UTF-8 text"))?;
+    Ok((project, body))
 }
 
 fn not_found(message: &str) -> Response {
@@ -113,7 +218,9 @@ fn bad_request(message: &str) -> Response {
 mod tests {
     use super::*;
     use crate::test_support::{TempRepo, PROJECT_ID};
-    use std::io::{Read, Write};
+    use std::io::{BufRead, BufReader, Read, Write};
+
+    const TOKEN: &str = "test-token";
 
     fn send(port: u16, method: &str, path: &str, headers: &str, body: &str) -> String {
         let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
@@ -144,8 +251,13 @@ mod tests {
             repo.root.clone(),
             repo.workspace.state_dir.clone(),
         ));
-        thread::spawn(move || serve(listener, workspace, Watcher::new()));
+        let context = Arc::new(Context::new(workspace, Watcher::new(), TOKEN.into()));
+        thread::spawn(move || serve(listener, context));
         port
+    }
+
+    fn auth() -> String {
+        format!("Authorization: Bearer {TOKEN}\r\n")
     }
 
     #[test]
@@ -193,12 +305,94 @@ mod tests {
     }
 
     #[test]
-    fn parses_comment_targets() {
-        assert_eq!(
-            comment_target("/api/projects/p/tasks/05/comments"),
-            Some(("p", "05"))
+    fn agent_api_requires_the_token() {
+        let repo = TempRepo::new();
+        let port = start(&repo);
+        let log_path = format!("/api/agent/projects/{PROJECT_ID}/tasks/02/log");
+        let rejected = send(
+            port,
+            "POST",
+            &log_path,
+            "Authorization: Bearer wrong\r\n",
+            "x",
         );
-        assert_eq!(comment_target("/api/projects/p"), None);
-        assert_eq!(comment_target("/api/projects/p/tasks/05"), None);
+        assert!(rejected.starts_with("HTTP/1.1 401"), "{rejected}");
+        assert!(send(port, "POST", &log_path, "", "x").starts_with("HTTP/1.1 401"));
+
+        let logged = send(port, "POST", &log_path, &auth(), "Started");
+        assert!(logged.starts_with("HTTP/1.1 201"), "{logged}");
+        assert_eq!(log::load(&repo.project_state(), "02")[0].message, "Started");
+
+        let comment =
+            comments::create(&repo.project_state(), "02", Author::User, "Hi", None).unwrap();
+        let reply_path = format!(
+            "/api/agent/projects/{PROJECT_ID}/comments/{}/reply?resolve=1",
+            comment.id
+        );
+        assert!(send(port, "POST", &reply_path, &auth(), "Done").starts_with("HTTP/1.1 201"));
+        let root = comments::find(&repo.project_state(), &comment.id).unwrap();
+        assert_eq!(root.status, comments::CommentStatus::Addressed);
+    }
+
+    #[test]
+    fn streams_comments_to_a_listening_agent() {
+        let repo = TempRepo::new();
+        let port = start(&repo);
+        let pending =
+            comments::create(&repo.project_state(), "02", Author::User, "Earlier", None).unwrap();
+
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(
+            stream,
+            "GET /api/agent/projects/{PROJECT_ID}/events?task=02 HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{}\r\n",
+            auth()
+        )
+        .unwrap();
+        let mut reader = BufReader::new(stream);
+        let mut read_until = |marker: &str| {
+            let mut seen = String::new();
+            loop {
+                let mut line = String::new();
+                assert!(
+                    reader.read_line(&mut line).unwrap() > 0,
+                    "stream closed: {seen}"
+                );
+                seen.push_str(&line);
+                if line.contains(marker) {
+                    return seen;
+                }
+            }
+        };
+        // Pending comments first, then `ready`.
+        let initial = read_until("event: ready");
+        assert!(initial.contains("data: Earlier"), "{initial}");
+        assert!(
+            comments::find(&repo.project_state(), &pending.id)
+                .unwrap()
+                .delivered
+        );
+
+        // The board shows task 02 as having a listener.
+        let detail = send(port, "GET", &format!("/api/projects/{PROJECT_ID}"), "", "");
+        assert!(detail.contains(r#""listening":true"#), "{detail}");
+
+        // A new comment from the board arrives immediately; one on another task does not.
+        let local = "Origin: http://localhost:1\r\n";
+        send(
+            port,
+            "POST",
+            &format!("/api/projects/{PROJECT_ID}/tasks/01/comments"),
+            local,
+            "Other task",
+        );
+        send(
+            port,
+            "POST",
+            &format!("/api/projects/{PROJECT_ID}/tasks/02/comments"),
+            local,
+            "Use retries",
+        );
+        let live = read_until("data: Use retries");
+        assert!(!live.contains("Other task"), "{live}");
     }
 }

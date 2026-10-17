@@ -7,6 +7,8 @@ use crate::project::log::LogEntry;
 use crate::project::{Project, ProjectSummary, Remote, Task};
 use crate::time::iso_utc;
 
+use super::hub::Listeners;
+
 /// `GET /api/projects`
 pub fn projects(repo_name: &str, projects: &[ProjectSummary]) -> Json {
     Json::Obj(vec![
@@ -23,9 +25,11 @@ pub fn projects(repo_name: &str, projects: &[ProjectSummary]) -> Json {
     ])
 }
 
-/// `GET /api/projects/<id>`: the summary fields plus phases, path, and tasks.
-pub fn project(project: &Project) -> Json {
+/// `GET /api/projects/<id>`: the summary fields plus phases, path, tasks,
+/// and which tasks have an agent listening for comments.
+pub fn project(project: &Project, listeners: &Listeners) -> Json {
     let mut fields = summary_fields(&project.summary);
+    fields.push(("agentListening", Json::Bool(listeners.all_tasks)));
     fields.push((
         "phases",
         Json::Arr(
@@ -43,7 +47,16 @@ pub fn project(project: &Project) -> Json {
         ),
     ));
     fields.push(("path", Json::str(&project.path)));
-    fields.push(("tasks", Json::Arr(project.tasks.iter().map(task).collect())));
+    fields.push((
+        "tasks",
+        Json::Arr(
+            project
+                .tasks
+                .iter()
+                .map(|t| task(t, listeners.tasks.contains(&t.number)))
+                .collect(),
+        ),
+    ));
     Json::Obj(fields)
 }
 
@@ -81,7 +94,7 @@ fn summary_fields(summary: &ProjectSummary) -> Vec<(&'static str, Json)> {
     ]
 }
 
-fn task(task: &Task) -> Json {
+fn task(task: &Task, listening: bool) -> Json {
     Json::Obj(vec![
         ("number", Json::str(&task.number)),
         ("file", Json::str(&task.file)),
@@ -99,6 +112,7 @@ fn task(task: &Task) -> Json {
             Json::Arr(task.comments.iter().map(comment).collect()),
         ),
         ("log", Json::Arr(task.log.iter().map(log_entry).collect())),
+        ("listening", Json::Bool(listening)),
     ])
 }
 
@@ -110,7 +124,7 @@ fn remote(remote: &Remote) -> Json {
     ])
 }
 
-fn log_entry(entry: &LogEntry) -> Json {
+pub fn log_entry(entry: &LogEntry) -> Json {
     Json::Obj(vec![
         ("time", Json::str(&entry.time)),
         ("message", Json::str(&entry.message)),
@@ -129,7 +143,10 @@ mod tests {
         let repo = TempRepo::new();
         comments::create(&repo.project_state(), "02", Author::User, "Hi", None).unwrap();
         log::append(&repo.project_state(), "02", "Started").unwrap();
-        let json = project(&load_project(&repo.workspace, PROJECT_ID).unwrap()).render();
+        let mut listeners = Listeners::default();
+        listeners.tasks.insert("02".into());
+        let project_data = load_project(&repo.workspace, PROJECT_ID).unwrap();
+        let json = project(&project_data, &listeners).render();
         for expected in [
             r#""title":"OAuth refresh""#,
             r#""counts":{"in_progress":1,"done":1}"#,
@@ -142,6 +159,8 @@ mod tests {
             r#""author":"user","#,
             r#""status":"open","delivered":false,"replyTo":null,"body":"Hi""#,
             r#""message":"Started""#,
+            r#""agentListening":false"#,
+            r#""listening":true}"#,
         ] {
             assert!(json.contains(expected), "missing {expected} in {json}");
         }

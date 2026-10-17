@@ -42,6 +42,12 @@ impl Watcher {
         });
     }
 
+    /// Signal a change that isn't a file change, such as an agent connecting.
+    pub fn bump(&self) {
+        *self.version.lock().unwrap() += 1;
+        self.changed.notify_all();
+    }
+
     pub fn current(&self) -> u64 {
         *self.version.lock().unwrap()
     }

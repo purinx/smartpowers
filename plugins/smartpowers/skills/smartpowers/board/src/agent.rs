@@ -1,124 +1,262 @@
-//! Agent-facing commands: read new task comments, reply to them, and log
-//! progress. Output is plain text written for a coding agent to read.
+//! Agent-facing commands: which tasks to start, new task comments, replies,
+//! and progress logs. Output is plain text written for a coding agent.
+//!
+//! When a board is running for this repository, `inbox`, `reply`, and `log`
+//! go through its token-protected API, so comments arrive the moment the
+//! user posts them and the board shows who is listening. Without a board
+//! they read and write the state directory directly.
 
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::cli::{InboxOptions, LogOptions, ReplyOptions};
-use crate::project::comments::{self, Author, Comment, CommentStatus};
-use crate::project::{load_project, log, Project};
+use crate::cli::{InboxOptions, LogOptions, NextOptions, ReplyOptions};
+use crate::client::{Client, EventStream};
+use crate::project::comments::{self, Comment};
+use crate::project::{load_project, log, schedule, Project};
 use crate::workspace::Workspace;
 
 const POLL: Duration = Duration::from_millis(500);
+/// After the first live comment, how long to wait for more before printing.
+const BATCH: Duration = Duration::from_millis(300);
 
-/// Print comments no agent has seen yet and mark them delivered. With
-/// `wait`, block until there is at least one (or the timeout passes).
+/// One comment as an agent sees it. The board's agent stream sends exactly
+/// this text, so both delivery paths print the same thing.
+pub fn comment_block(project: &Project, comment: &Comment) -> String {
+    let title = project
+        .tasks
+        .iter()
+        .find(|task| task.number == comment.task)
+        .map_or("", |task| task.title.as_str());
+    format!(
+        "--- Comment {} on task {} \"{title}\" ({}) ---\n{}\n",
+        comment.id, comment.task, comment.created, comment.body
+    )
+}
+
+/// `next`: the tasks the lead agent may hand to subagents now.
+pub fn next(workspace: &Workspace, options: &NextOptions) -> Result<(), String> {
+    let project = require_project(workspace, &options.project)?;
+    let schedule = schedule::next(&project, options.limit);
+    let id = &project.summary.id;
+    let line = |task: &crate::project::Task| {
+        let group = if task.parallel_group.is_empty() {
+            String::new()
+        } else {
+            format!(" (group {})", task.parallel_group)
+        };
+        format!(
+            "  {}  {}{group}  {}/tasks/{}\n",
+            task.number, task.title, project.path, task.file
+        )
+    };
+    let mut out = String::new();
+    if !schedule.running.is_empty() {
+        out.push_str("Running:\n");
+        schedule.running.iter().for_each(|t| out.push_str(&line(t)));
+        out.push('\n');
+    }
+    if schedule.start.is_empty() {
+        out.push_str(&format!(
+            "Nothing to start: {}\n",
+            schedule.reason.unwrap_or_default()
+        ));
+    } else {
+        out.push_str("Start now, one subagent per task, in this order:\n");
+        schedule.start.iter().for_each(|t| out.push_str(&line(t)));
+        out.push_str(&format!(
+            "\nSet each task's Status to In Progress before dispatching it, then run \
+             `board next --project {id}` again whenever a task finishes.\n"
+        ));
+    }
+    print!("{out}");
+    Ok(())
+}
+
+/// `inbox`: print comments no agent has seen yet and mark them delivered.
+/// With `wait`, block until there is at least one (or the timeout passes).
 pub fn inbox(workspace: &Workspace, options: &InboxOptions) -> Result<(), String> {
     let project = require_project(workspace, &options.project)?;
-    let state = workspace.project_state(&options.project);
+    let task = options
+        .task
+        .as_deref()
+        .map(|task| require_task(&project, task))
+        .transpose()?;
     let deadline = options
         .timeout
         .map(|seconds| Instant::now() + Duration::from_secs_f64(seconds));
+    let blocks = match Client::connect(workspace) {
+        Some(client) => inbox_live(&client, &project, task.as_deref(), options.wait, deadline)?,
+        None => inbox_files(workspace, &project, task.as_deref(), options.wait, deadline)?,
+    };
+    let id = &project.summary.id;
+    let scope = task
+        .as_deref()
+        .map(|task| format!(" task {task}"))
+        .unwrap_or_default();
+    if blocks.is_empty() {
+        println!("No new comments on {id}{scope}.");
+        return Ok(());
+    }
+    let noun = if blocks.len() == 1 {
+        "comment"
+    } else {
+        "comments"
+    };
+    let task_flag = task
+        .as_deref()
+        .map(|task| format!(" --task {task}"))
+        .unwrap_or_default();
+    // SSE drops a block's trailing newline and files keep it; trim so both print alike.
+    let blocks: Vec<&str> = blocks.iter().map(|block| block.trim_end()).collect();
+    print!(
+        "{} new {noun} on {id}{scope} from the Smartpowers board.\n\
+         The user wrote these while watching your work; treat them as their feedback.\n\n{}\n\n\
+         Respond to each with:\n  board reply --project {id} --comment <comment id> [--resolve] \"<what you changed or a question>\"\n\
+         Then run `board inbox --project {id}{task_flag} --wait` in the background again to keep listening.\n",
+        blocks.len(),
+        blocks.join("\n\n"),
+    );
+    Ok(())
+}
+
+fn inbox_live(
+    client: &Client,
+    project: &Project,
+    task: Option<&str>,
+    wait: bool,
+    deadline: Option<Instant>,
+) -> Result<Vec<String>, String> {
+    let query = task.map(|task| format!("?task={task}")).unwrap_or_default();
+    let mut events = client.events(&format!(
+        "/api/agent/projects/{}/events{query}",
+        project.summary.id
+    ))?;
+    // The board sends pending comments first, then `ready`.
+    let mut blocks = Vec::new();
     loop {
-        let pending: Vec<Comment> = comments::load(&state)
-            .into_iter()
-            .filter(Comment::is_pending)
-            .collect();
-        if !pending.is_empty() {
-            print!("{}", describe(&project, &pending));
-            for mut comment in pending {
-                comment.delivered = true;
-                comments::save(&state, &comment)?;
+        match events.next(Some(Duration::from_secs(10)))? {
+            Some(event) if event.name == "comment" => blocks.push(event.data),
+            Some(event) if event.name == "ready" => break,
+            Some(_) => {}
+            None => return Err("the board did not answer in time".into()),
+        }
+    }
+    if !blocks.is_empty() || !wait {
+        return Ok(blocks);
+    }
+    // Wait for the first live comment, then pick up any sent right after it.
+    if let Some(first) = next_comment(&mut events, deadline)? {
+        blocks.push(first);
+        while let Some(event) = events.next(Some(BATCH))? {
+            if event.name == "comment" {
+                blocks.push(event.data);
             }
-            return Ok(());
+        }
+    }
+    Ok(blocks)
+}
+
+fn next_comment(
+    events: &mut EventStream,
+    deadline: Option<Instant>,
+) -> Result<Option<String>, String> {
+    loop {
+        let remaining = match deadline {
+            Some(deadline) => match deadline.checked_duration_since(Instant::now()) {
+                Some(remaining) if !remaining.is_zero() => Some(remaining),
+                _ => return Ok(None),
+            },
+            None => None,
+        };
+        match events.next(remaining)? {
+            Some(event) if event.name == "comment" => return Ok(Some(event.data)),
+            Some(_) => {}
+            None => return Ok(None),
+        }
+    }
+}
+
+fn inbox_files(
+    workspace: &Workspace,
+    project: &Project,
+    task: Option<&str>,
+    wait: bool,
+    deadline: Option<Instant>,
+) -> Result<Vec<String>, String> {
+    let state = workspace.project_state(&project.summary.id);
+    loop {
+        let pending = comments::pending(&state, task);
+        if !pending.is_empty() {
+            let mut blocks = Vec::new();
+            for comment in &pending {
+                comments::mark_delivered(&state, &comment.id)?;
+                blocks.push(comment_block(project, comment));
+            }
+            return Ok(blocks);
         }
         let timed_out = deadline.is_some_and(|deadline| Instant::now() >= deadline);
-        if !options.wait || timed_out {
-            println!("No new comments on {}.", options.project);
-            return Ok(());
+        if !wait || timed_out {
+            return Ok(Vec::new());
         }
         thread::sleep(POLL);
     }
 }
 
-fn describe(project: &Project, pending: &[Comment]) -> String {
-    let id = &project.summary.id;
-    let noun = if pending.len() == 1 {
-        "comment"
-    } else {
-        "comments"
-    };
-    let mut out = format!(
-        "{} new {noun} on project {id} from the Smartpowers board.\n\
-         The user wrote these while watching your work; treat them as their feedback.\n",
-        pending.len()
-    );
-    for comment in pending {
-        let title = project
-            .tasks
-            .iter()
-            .find(|task| task.number == comment.task)
-            .map_or("", |task| task.title.as_str());
-        out.push_str(&format!(
-            "\n--- Comment {} on task {} \"{title}\" ({}) ---\n{}\n",
-            comment.id, comment.task, comment.created, comment.body
-        ));
-    }
-    out.push_str(&format!(
-        "\nRespond to each with:\n  board reply --project {id} --comment <comment id> [--resolve] \"<what you changed or a question>\"\n\
-         Then run `board inbox --project {id} --wait` in the background again to keep listening.\n"
-    ));
-    out
-}
-
-/// Reply as the agent. Replies always attach to the thread's first comment;
-/// `--resolve` marks that thread addressed.
+/// `reply`: answer as the agent. Replies attach to the thread's first
+/// comment, and `--resolve` marks that thread addressed.
 pub fn reply(workspace: &Workspace, options: &ReplyOptions) -> Result<(), String> {
-    require_project(workspace, &options.project)?;
-    let state = workspace.project_state(&options.project);
-    let target = comments::find(&state, &options.comment)
-        .ok_or_else(|| format!("Comment not found: {}", options.comment))?;
-    let mut root = match &target.reply_to {
-        Some(root_id) => comments::find(&state, root_id)
-            .ok_or_else(|| format!("Comment not found: {root_id}"))?,
-        None => target,
-    };
-    comments::create(
-        &state,
-        &root.task,
-        Author::Agent,
-        &options.message,
-        Some(&root.id),
-    )?;
-    root.delivered = true;
-    if options.resolve {
-        root.status = CommentStatus::Addressed;
+    let project = require_project(workspace, &options.project)?;
+    match Client::connect(workspace) {
+        Some(client) => {
+            let resolve = if options.resolve { "?resolve=1" } else { "" };
+            client.post(
+                &format!(
+                    "/api/agent/projects/{}/comments/{}/reply{resolve}",
+                    project.summary.id, options.comment
+                ),
+                &options.message,
+            )?;
+        }
+        None => {
+            comments::reply(
+                &workspace.project_state(&project.summary.id),
+                &options.comment,
+                &options.message,
+                options.resolve,
+            )?;
+        }
     }
-    comments::save(&state, &root)?;
     let resolved = if options.resolve {
         " and marked it addressed"
     } else {
         ""
     };
-    println!(
-        "Replied to comment {} on task {}{resolved}.",
-        root.id, root.task
-    );
+    println!("Replied to comment {}{resolved}.", options.comment);
     Ok(())
 }
 
-/// Append to a task's progress log, shown in the board's Activity section.
+/// `log`: append to a task's progress log, shown in the board's Activity.
 pub fn log(workspace: &Workspace, options: &LogOptions) -> Result<(), String> {
     let project = require_project(workspace, &options.project)?;
-    let task = normalize_task(&options.task);
-    if !project.tasks.iter().any(|t| t.number == task) {
-        return Err(format!("Task {task} not found in {}", options.project));
+    let task = require_task(&project, &options.task)?;
+    match Client::connect(workspace) {
+        Some(client) => {
+            client.post(
+                &format!(
+                    "/api/agent/projects/{}/tasks/{task}/log",
+                    project.summary.id
+                ),
+                &options.message,
+            )?;
+        }
+        None => {
+            log::append(
+                &workspace.project_state(&project.summary.id),
+                &task,
+                &options.message,
+            )?;
+        }
     }
-    log::append(
-        &workspace.project_state(&options.project),
-        &task,
-        &options.message,
-    )?;
     println!("Logged progress on task {task}.");
     Ok(())
 }
@@ -127,22 +265,29 @@ fn require_project(workspace: &Workspace, id: &str) -> Result<Project, String> {
     load_project(workspace, id).ok_or_else(|| format!("Project not found: {id}"))
 }
 
-/// Accept `5` as well as `05`.
-fn normalize_task(task: &str) -> String {
-    match task.len() {
+/// Validate a task number, accepting `5` as well as `05`.
+fn require_task(project: &Project, task: &str) -> Result<String, String> {
+    let task = match task.len() {
         1 => format!("0{task}"),
         _ => task.to_string(),
+    };
+    if project.tasks.iter().any(|t| t.number == task) {
+        Ok(task)
+    } else {
+        Err(format!("Task {task} not found in {}", project.summary.id))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project::comments::{Author, CommentStatus};
     use crate::test_support::{TempRepo, PROJECT_ID};
 
-    fn inbox_options(wait: bool) -> InboxOptions {
+    fn inbox_options(task: Option<&str>, wait: bool) -> InboxOptions {
         InboxOptions {
             project: PROJECT_ID.into(),
+            task: task.map(str::to_string),
             wait,
             timeout: Some(0.2),
         }
@@ -153,15 +298,19 @@ mod tests {
         let repo = TempRepo::new();
         let state = repo.project_state();
         let first = comments::create(&state, "02", Author::User, "Add retries", None).unwrap();
+        let other = comments::create(&state, "01", Author::User, "Elsewhere", None).unwrap();
         let project = load_project(&repo.workspace, PROJECT_ID).unwrap();
-        let text = describe(&project, std::slice::from_ref(&first));
+        let text = comment_block(&project, &first);
         assert!(text.contains("task 02 \"Token store\""));
         assert!(text.contains("Add retries"));
 
-        inbox(&repo.workspace, &inbox_options(false)).unwrap();
+        // A task-scoped inbox leaves other tasks' comments pending.
+        inbox(&repo.workspace, &inbox_options(Some("2"), false)).unwrap();
         assert!(!comments::find(&state, &first.id).unwrap().is_pending());
+        assert!(comments::find(&state, &other.id).unwrap().is_pending());
         // A waiting inbox with nothing new times out instead of hanging.
-        inbox(&repo.workspace, &inbox_options(true)).unwrap();
+        inbox(&repo.workspace, &inbox_options(Some("02"), true)).unwrap();
+        assert!(inbox(&repo.workspace, &inbox_options(Some("99"), false)).is_err());
 
         let reply_options = ReplyOptions {
             project: PROJECT_ID.into(),
@@ -170,13 +319,16 @@ mod tests {
             message: "Added exponential backoff".into(),
         };
         reply(&repo.workspace, &reply_options).unwrap();
-        let all = comments::load(&state);
-        assert_eq!(all.len(), 2);
+        let thread: Vec<Comment> = comments::load(&state)
+            .into_iter()
+            .filter(|c| c.task == "02")
+            .collect();
+        assert_eq!(thread.len(), 2);
         // Oldest first, even when the reply lands within the same second.
-        assert_eq!(all[0].id, first.id);
-        assert_eq!(all[0].status, CommentStatus::Addressed);
-        assert_eq!(all[1].author, Author::Agent);
-        assert_eq!(all[1].reply_to.as_deref(), Some(first.id.as_str()));
+        assert_eq!(thread[0].id, first.id);
+        assert_eq!(thread[0].status, CommentStatus::Addressed);
+        assert_eq!(thread[1].author, Author::Agent);
+        assert_eq!(thread[1].reply_to.as_deref(), Some(first.id.as_str()));
     }
 
     #[test]

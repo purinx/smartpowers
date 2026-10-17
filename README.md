@@ -66,10 +66,15 @@ Each task's detail panel has an **Activity** section and a comment box:
 - **Comments:** type feedback and press <kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd>. While the agent implements tasks, it keeps `board inbox --wait` running in the background. Your comment ends that wait, so the agent sees it during its current work rather than at the end. The agent then adjusts course and answers with `board reply`, and the comment shows **Waiting for agent → Sent to agent → Addressed**.
 
 ```bash
-board inbox --project <id> [--wait] [--timeout <secs>]           # new comments, each delivered once
+board next  --project <id> [--limit <n>]                          # tasks the lead agent can start now
+board inbox --project <id> [--task <nn>] [--wait] [--timeout <secs>]  # new comments, each delivered once
 board reply --project <id> --comment <id> [--resolve] <message>  # answer as the agent
 board log   --project <id> --task <nn> <message>                 # add a progress entry
 ```
+
+### Parallel tasks with subagents
+
+The lead agent starts the board, runs `board next`, and hands each listed task to its own subagent in its own git worktree. `board next` returns ready tasks from `tasks/PLAN.md` that share a parallel group. Each subagent connects to the board with `board inbox --task <nn> --wait`, streams progress with `board log`, and receives comments on its task the moment you post them. Cards of tasks with a connected agent show a live **Agent** badge. As subagents finish, the lead agent merges their branches, marks tasks Done, and dispatches the next ready group. While a board is running, these commands use its API, authenticated with a per-run token stored next to the comments. Without a board, they fall back to reading and writing those files directly.
 
 Comments and logs live outside the repository, in `~/.local/state/smartpowers/<repo>-<hash>/` (Windows: `%LOCALAPPDATA%\smartpowers\state`; override with `SMARTPOWERS_STATE_HOME`). Agents treat comments as your instructions, so keeping them out of version control means a file someone commits can never pose as your feedback. The board writes nothing to the repository, and it accepts new comments only from its own page.
 

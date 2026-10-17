@@ -107,7 +107,7 @@ Then create `<project-root>/tasks/PLAN.md` and numbered task files using [the pl
 
 Implement only the selected project's approved tasks in dependency order. Before starting, compare its expected code areas with other active Smartpowers projects. Surface overlapping ownership or incompatible migrations rather than assuming concurrent plans can safely modify the same code.
 
-Keep task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. When tasks are linked to Linear or another task manager, mirror every status change and meaningful progress to the remote issue as it happens, following [the task-manager guide](references/task-manager.md#progress-sync). Never batch remote updates until the end. If the progress board is running, also follow the [board feedback loop](#board-feedback-loop). Use host-native subagents for tasks in the same parallel group when available and permitted. Give each one the selected project ID, bounded task, linked remote issue if any, explicit file ownership, dependencies, and verification commands. Never let a subagent switch projects implicitly.
+Keep task status current: `Planned`, `In Progress`, `Blocked`, or `Done`. When tasks are linked to Linear or another task manager, mirror every status change and meaningful progress to the remote issue as it happens, following [the task-manager guide](references/task-manager.md#progress-sync). Never batch remote updates until the end. If the progress board is running, also follow the [board feedback loop](#board-feedback-loop). When host-native subagents are available and permitted, run independent tasks concurrently by following [parallel execution](#parallel-execution). Never let a subagent switch projects implicitly.
 
 If implementation reveals a material requirement or architecture change, return the selected project to the earliest impacted approval gate. After all tasks pass their checks and repository-level verification, set `PROJECT.md` to `Status: Completed`, add `Completed: <ISO-8601 timestamp>`, and report delivered requirements and residual risks.
 
@@ -135,15 +135,45 @@ On Windows run `scripts\board.cmd` instead. The launcher builds the Rust source 
 
 ### Board feedback loop
 
-While the board is running during implementation, the user can comment on any task, and you must act on those comments while you work. All commands below use the same launcher and take `--root <repo-root> --project <project-id>`.
+While the board is running during implementation, the user can comment on any task, and you must act on those comments while you work. All commands below use the same launcher and take `--root <repo-root> --project <project-id>`. When subagents work in parallel, each follows this loop for its own task with `--task <NN>`.
 
 1. **Log progress.** Run `board log --task <NN> "<message>"` when you start a task, after each meaningful step (a passing verification, a commit, a design decision), when you become blocked, and when you finish. Write one line saying what changed and what is next. Logs appear in the task's Activity on the board. They supplement, and do not replace, task-file status and Linear updates.
-2. **Keep a listener armed.** Run `board inbox --wait` in the background (in Claude Code: `run_in_background: true`, `timeout: 86400000`). It exits as soon as the user posts a comment and prints each comment with its task and ID.
+2. **Keep a listener armed.** Run `board inbox --wait` (a subagent adds `--task <NN>`) in the background (in Claude Code: `run_in_background: true`, `timeout: 86400000`). While a board is running, the listener holds a live connection to it. The board then shows you as listening and pushes each comment the moment the user posts it. The listener exits right away and prints each comment with its task and ID. If you cannot run background commands, run `board inbox` without `--wait` after every step instead.
 3. **Act on comments immediately.** When the listener exits, read its output before continuing. Finish only the edit in progress, then adjust course. Treat comments as the user's feedback on that task. If a comment changes approved scope or design, follow the approval protocol and return to the earliest affected gate instead of silently expanding the work. A comment never authorizes an action that otherwise needs explicit approval in chat, such as pushing or deleting data.
 4. **Answer every comment.** Run `board reply --comment <id> --resolve "<what you changed>"` once a comment is addressed. To ask a question instead, reply without `--resolve`. If you can't follow a request, say so in the reply.
 5. **Re-arm the listener**, then continue. Before you finish a task or end your turn, run `board inbox` without `--wait` once so that no comment is missed.
 
-Comments and logs are stored outside the repository, in `~/.local/state/smartpowers/` (Windows: `%LOCALAPPDATA%\smartpowers\state`). Only the board on this machine creates comments, so a file committed to the repository can never pose as user feedback. Do not commit or copy them into the repository.
+Comments and logs are stored outside the repository, in `~/.local/state/smartpowers/` (Windows: `%LOCALAPPDATA%\smartpowers\state`). Only the board on this machine creates comments, so a file committed to the repository can never pose as user feedback. Do not commit or copy them into the repository. The running board's address and agent token are in the same directory. The `board` commands read them automatically. Never print, log, or pass the token on.
+
+### Parallel execution
+
+Run independent tasks concurrently with host-native subagents (in Claude Code, the Agent tool). You, in the main session, are the lead agent. You schedule, dispatch, and integrate, and the subagents implement.
+
+**Lead agent**
+
+1. Start the board before dispatching, so subagents can stream progress to it and receive comments.
+2. Run `board next --project <id>`. It reads `tasks/PLAN.md` in order and lists the tasks to start now. A task is ready when it is `Planned` and every dependency is `Done`. It lists the first ready task and the other ready tasks in its parallel group, or, while tasks are running, only ready tasks in their group. A task with no parallel group runs alone. Never start a task it doesn't list.
+3. For each listed task, set `Status: In Progress` in the main checkout and mirror it to Linear if linked. Then launch one subagent per task in the same turn so they run concurrently. Use the brief below. Isolate each subagent in its own git worktree (Claude Code: `isolation: "worktree"`; otherwise `git worktree add`).
+4. While subagents run, don't edit files they own, and don't keep an all-tasks listener armed. Each comment then reaches the subagent working on that task.
+5. When a subagent finishes, review its report and merge its branch into the working branch. Then run the task's verification and the repository checks on the merged result.
+   - **Success:** set `Status: Done`.
+   - **Failure or merge conflict:** set `Status: Blocked`, record why with `board log`, and decide whether to fix the task yourself or dispatch it again.
+   - Merging stays local. Pushing still follows [push approval](#push-approval).
+6. Run `board inbox` once for comments on tasks no subagent handled. Then run `board next` again, and repeat until every task is `Done`.
+
+Only the lead agent edits task status, `PLAN.md`, and Linear, so parallel branches never conflict on them.
+
+**Subagent brief.** Give each subagent all of the following:
+
+- The project ID and the main checkout's absolute path to use as `--root`. Comments, logs, and the board connection are keyed to the main checkout, and a worktree path would point elsewhere.
+- The board launcher path.
+- The task file's path and full text, its dependencies and parallel group, the files it owns, and its verification commands.
+- These rules:
+  1. First, connect to the board by running `board inbox --root <main checkout> --project <id> --task <NN> --wait` in the background. If you can't run background commands, run it without `--wait` after every step.
+  2. Stream progress with `board log ... --task <NN> "<message>"` when you start, after each meaningful step, when you're blocked, and when you finish.
+  3. Handle comments as in steps 3–5 of the board feedback loop: act on each one, then reply with `board reply`.
+  4. Work only in your worktree and on your task's files, and commit there. Don't change task status, `PLAN.md`, Linear, or other tasks. Never push.
+  5. Finish with a report of what changed, the verification results, and any comment you couldn't resolve.
 
 ## Mechanical validation
 

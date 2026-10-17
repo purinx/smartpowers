@@ -29,6 +29,7 @@ export function renderHeader() {
 
   byId('project-title').textContent = project.title;
   byId('project-status').textContent = project.status;
+  byId('lead-agent').hidden = !project.agentListening;
   byId('project-id').textContent = project.id;
   byId('phases').replaceChildren(...project.phases.map(phaseChip));
   renderProgress(project);

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -136,6 +137,62 @@ class BoardLauncherTests(unittest.TestCase):
         self.assertEqual(task["log"][0]["message"], "Swapped the client; tests pass")
         # Nothing was written inside the repository.
         self.assertFalse(any(p.name.endswith(".tmp") or "comments" in p.parts for p in self.root.rglob("*")))
+
+    def test_subagent_receives_comments_live(self) -> None:
+        port = self.port()
+        listener = subprocess.Popen(
+            [str(LAUNCHER), "inbox", "--root", str(self.root), "--project", PROJECT_ID,
+             "--task", "01", "--wait", "--timeout", "60"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=self.env,
+        )
+        try:
+            # The board shows the task as having a listening agent once it connects.
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                _, body = self.request(port, f"/api/projects/{PROJECT_ID}")
+                if json.loads(body)["tasks"][0]["listening"]:
+                    break
+                time.sleep(0.2)
+            else:
+                self.fail("the inbox never connected to the board")
+
+            sent = time.monotonic()
+            status, _ = self.request(
+                port,
+                f"/api/projects/{PROJECT_ID}/tasks/01/comments",
+                {"Origin": f"http://localhost:{port}"},
+                method="POST",
+                body="Rename the module".encode("utf-8"),
+            )
+            self.assertEqual(status, 201)
+            out, err = listener.communicate(timeout=30)
+            self.assertEqual(listener.returncode, 0, err)
+            self.assertIn("Rename the module", out)
+            self.assertIn("--task 01 --wait", out)
+            # Pushed over SSE, not found by polling.
+            self.assertLess(time.monotonic() - sent, 5)
+        finally:
+            if listener.poll() is None:
+                listener.kill()
+                listener.communicate()
+
+    def test_next_lists_parallel_tasks_in_plan_order(self) -> None:
+        tasks = self.root / "docs" / "smartpowers" / "projects" / PROJECT_ID / "tasks"
+        write(tasks / "01_infra_foundations.md",
+              f"# 01: Infrastructure foundations\n\nStatus: Done\nProject: {PROJECT_ID}\nDepends on: None\n")
+        for number, name in (("02", "domain"), ("03", "api")):
+            write(tasks / f"{number}_{name}.md",
+                  f"# {number}: {name}\n\nStatus: Planned\nProject: {PROJECT_ID}\n"
+                  "Depends on: 01\nParallel group: B\n")
+        write(tasks / "PLAN.md", "| 01 | [a](01_infra_foundations.md) |\n| 03 | [c](03_api.md) |\n| 02 | [b](02_domain.md) |\n")
+
+        result = self.board("next")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Start now", result.stdout)
+        self.assertLess(result.stdout.index("03  api"), result.stdout.index("02  domain"))
 
     def test_rejects_non_loopback_host(self) -> None:
         result = subprocess.run(

@@ -6,7 +6,9 @@ use std::process::Command as Process;
 pub const USAGE: &str = "\
 Usage:
   smartpowers-board [serve] [options]   Serve the progress board
-  smartpowers-board inbox --project <id> [--wait] [--timeout <secs>]
+  smartpowers-board next --project <id> [--limit <n>]
+                                        List tasks the lead agent can start now
+  smartpowers-board inbox --project <id> [--task <nn>] [--wait] [--timeout <secs>]
                                         Print new task comments for the agent
   smartpowers-board reply --project <id> --comment <id> [--resolve] <message>
                                         Reply to a comment as the agent
@@ -21,8 +23,12 @@ Serve options:
   --no-open           Do not open a browser
 
 Inbox options:
+  --task <nn>         Only comments on this task (for subagents)
   --wait              Block until at least one new comment arrives
   --timeout <secs>    With --wait, give up after this many seconds
+
+Next options:
+  --limit <n>         Start at most this many tasks
 
 Common options:
   --root <dir>        Repository root (default: current directory)
@@ -42,6 +48,7 @@ pub struct ServeOptions {
 #[derive(Debug)]
 pub struct InboxOptions {
     pub project: String,
+    pub task: Option<String>,
     pub wait: bool,
     pub timeout: Option<f64>,
 }
@@ -62,8 +69,15 @@ pub struct LogOptions {
 }
 
 #[derive(Debug)]
+pub struct NextOptions {
+    pub project: String,
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug)]
 pub enum Command {
     Serve(ServeOptions),
+    Next(NextOptions),
     Inbox(InboxOptions),
     Reply(ReplyOptions),
     Log(LogOptions),
@@ -82,7 +96,7 @@ pub enum ParseOutcome {
     Error(String),
 }
 
-const COMMANDS: [&str; 4] = ["serve", "inbox", "reply", "log"];
+const COMMANDS: [&str; 5] = ["serve", "next", "inbox", "reply", "log"];
 
 /// Parse a subcommand (default `serve`) and its `--flag value`,
 /// `--flag=value`, and positional arguments.
@@ -112,6 +126,7 @@ fn parse_command(name: &str, args: Vec<String>) -> Result<Option<Invocation>, St
     };
     let (mut wait, mut timeout) = (false, None);
     let (mut comment, mut resolve, mut task) = (None, false, None);
+    let mut limit = None;
     let mut positionals = Vec::new();
 
     let mut args = args.into_iter();
@@ -150,9 +165,18 @@ fn parse_command(name: &str, args: Vec<String>) -> Result<Option<Invocation>, St
             ("serve", "--no-open") => serve.open = false,
             ("inbox", "--wait") => wait = true,
             ("inbox", "--timeout") => timeout = Some(positive(&value()?, "--timeout")?),
+            ("inbox" | "log", "--task") => task = Some(value()?),
+            ("next", "--limit") => {
+                limit = Some(
+                    value()?
+                        .parse()
+                        .ok()
+                        .filter(|n: &usize| *n > 0)
+                        .ok_or("--limit must be a positive integer")?,
+                );
+            }
             ("reply", "--comment") => comment = Some(value()?),
             ("reply", "--resolve") => resolve = true,
-            ("log", "--task") => task = Some(value()?),
             _ => return Err(format!("Unknown argument for {name}: {flag}")),
         }
     }
@@ -172,8 +196,13 @@ fn parse_command(name: &str, args: Vec<String>) -> Result<Option<Invocation>, St
     }
 
     let command = match name {
+        "next" => Command::Next(NextOptions {
+            project: require(project, "--project")?,
+            limit,
+        }),
         "inbox" => Command::Inbox(InboxOptions {
             project: require(project, "--project")?,
+            task,
             wait,
             timeout,
         }),
@@ -247,10 +276,18 @@ mod tests {
 
     #[test]
     fn parses_agent_commands() {
-        let Command::Inbox(inbox) = run(&["inbox", "--project", "p", "--wait"]).command else {
+        let Command::Inbox(inbox) =
+            run(&["inbox", "--project", "p", "--task", "02", "--wait"]).command
+        else {
             panic!("expected inbox");
         };
         assert!(inbox.wait && inbox.timeout.is_none());
+        assert_eq!(inbox.task.as_deref(), Some("02"));
+
+        let Command::Next(next) = run(&["next", "--project", "p", "--limit", "2"]).command else {
+            panic!("expected next");
+        };
+        assert_eq!(next.limit, Some(2));
 
         let Command::Reply(reply) = run(&[
             "reply",
@@ -302,5 +339,7 @@ mod tests {
         assert!(error(&["inbox", "--project", "p", "--port", "1"]).contains("--port"));
         assert!(error(&["log", "--project", "p", "--task", "01"]).contains("message"));
         assert!(error(&["serve", "stray"]).contains("stray"));
+        assert!(error(&["next", "--project", "p", "--limit", "0"]).contains("--limit"));
+        assert!(error(&["next", "--project", "p", "--task", "01"]).contains("--task"));
     }
 }

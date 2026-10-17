@@ -241,6 +241,13 @@ body.resizing { cursor: col-resize; user-select: none; }
 
 .card-log { margin: 6px 0 0 22px; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip.comments { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.agent-live { gap: 6px; color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.live-pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s ease-out infinite; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
+  100% { box-shadow: 0 0 0 6px transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .live-pulse { animation: none; } }
 
 @keyframes flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: var(--shadow); } }
 .flash { animation: flash 1.6s ease-out; }

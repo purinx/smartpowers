@@ -4,6 +4,7 @@
 pub mod comments;
 pub mod log;
 mod markdown;
+pub mod schedule;
 mod task;
 
 use std::collections::BTreeMap;
@@ -49,6 +50,8 @@ pub struct Project {
     pub phases: Vec<Phase>,
     /// Repository-relative project directory.
     pub path: String,
+    /// Task numbers in `tasks/PLAN.md` execution order.
+    pub plan_order: Vec<String>,
     pub tasks: Vec<Task>,
 }
 
@@ -124,6 +127,9 @@ pub fn load_project(workspace: &Workspace, id: &str) -> Option<Project> {
         summary: summarize(&root, &tasks),
         phases,
         path: format!("{PROJECTS_PATH}/{id}"),
+        plan_order: fs::read_to_string(root.join("tasks").join("PLAN.md"))
+            .map(|plan| schedule::plan_order(&plan))
+            .unwrap_or_default(),
         tasks,
     })
 }

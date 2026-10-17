@@ -17,6 +17,11 @@ export function waitingOn(task) {
 // `compact` shows at most two requirement IDs plus a "+N" overflow chip.
 export function taskChips(task, compact) {
   const chips = [];
+  if (task.listening) {
+    chips.push(el('span', { class: 'chip agent-live', title: 'An agent is working on this task and receives comments instantly' }, [
+      el('span', { class: 'live-pulse', 'aria-hidden': 'true' }), 'Agent',
+    ]));
+  }
   const open = openComments(task).length;
   if (open) {
     chips.push(el('span', { class: 'chip comments', title: 'Open comments for the agent' }, '💬 ' + open));

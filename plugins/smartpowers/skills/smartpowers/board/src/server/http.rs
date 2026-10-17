@@ -19,6 +19,8 @@ pub struct Request {
     pub method: String,
     /// Path without query string or fragment.
     pub path: String,
+    /// Raw query string without the `?`.
+    pub query: String,
     /// Header names are lowercased.
     headers: BTreeMap<String, String>,
     pub body: Vec<u8>,
@@ -32,6 +34,18 @@ impl Request {
     /// other sites from posting comments through the user's browser.
     pub fn has_origin(&self) -> bool {
         self.headers.contains_key("origin")
+    }
+
+    /// A header value by case-insensitive name.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers.get(&name.to_lowercase()).map(String::as_str)
+    }
+
+    /// A query parameter's raw value, e.g. `task` in `?task=05`.
+    pub fn query_param(&self, name: &str) -> Option<&str> {
+        self.query
+            .split('&')
+            .find_map(|pair| pair.strip_prefix(name)?.strip_prefix('='))
     }
 
     /// The board exposes repository files, so reject requests whose Host or
@@ -58,7 +72,9 @@ pub fn read_request(stream: &TcpStream) -> Option<Request> {
     let mut parts = line.split_whitespace();
     let method = parts.next()?.to_string();
     let target = parts.next()?;
-    let path = target.split(['?', '#']).next().unwrap_or("/").to_string();
+    let target = target.split('#').next().unwrap_or("/");
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    let (path, query) = (path.to_string(), query.to_string());
 
     let mut headers = BTreeMap::new();
     loop {
@@ -88,6 +104,7 @@ pub fn read_request(stream: &TcpStream) -> Option<Request> {
     Some(Request {
         method,
         path,
+        query,
         headers,
         body,
         body_too_large,
@@ -157,6 +174,7 @@ mod tests {
         Request {
             method: "GET".into(),
             path: "/".into(),
+            query: "task=05&resolve=1".into(),
             headers: headers
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -164,6 +182,15 @@ mod tests {
             body: Vec::new(),
             body_too_large: false,
         }
+    }
+
+    #[test]
+    fn reads_headers_and_query_parameters() {
+        let request = request(&[("authorization", "Bearer abc")]);
+        assert_eq!(request.header("Authorization"), Some("Bearer abc"));
+        assert_eq!(request.query_param("task"), Some("05"));
+        assert_eq!(request.query_param("resolve"), Some("1"));
+        assert_eq!(request.query_param("res"), None);
     }
 
     #[test]

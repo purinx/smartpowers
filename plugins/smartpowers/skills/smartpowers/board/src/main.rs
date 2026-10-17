@@ -6,7 +6,9 @@
 //!
 //! Modules:
 //! - `cli`        command-line parsing and browser launching
-//! - `agent`      `inbox`, `reply`, and `log` commands for coding agents
+//! - `agent`      `next`, `inbox`, `reply`, and `log` commands for coding agents
+//! - `client`     HTTP client those commands use to reach a running board
+//! - `runtime`    the running board's address and agent token
 //! - `project`    projects and tasks, plus their comments and logs
 //! - `server`     HTTP routing, JSON API, embedded web UI, and live events
 //! - `watcher`    polling the workspace for changes
@@ -15,9 +17,11 @@
 
 mod agent;
 mod cli;
+mod client;
 mod files;
 mod json;
 mod project;
+mod runtime;
 mod server;
 mod time;
 mod watcher;
@@ -51,6 +55,7 @@ fn main() -> ExitCode {
     };
     let result = open_workspace(&invocation.root).and_then(|workspace| match &invocation.command {
         Command::Serve(options) => serve(workspace, options),
+        Command::Next(options) => agent::next(&workspace, options),
         Command::Inbox(options) => agent::inbox(&workspace, options),
         Command::Reply(options) => agent::reply(&workspace, options),
         Command::Log(options) => agent::log(&workspace, options),
@@ -84,9 +89,13 @@ fn serve(workspace: Workspace, options: &ServeOptions) -> Result<(), String> {
     let host = options.host.trim_matches(['[', ']']);
     let listener = TcpListener::bind((host, options.port))
         .map_err(|error| format!("cannot listen on {host}:{}: {error}", options.port))?;
-    let port = listener
+    let addr = listener
         .local_addr()
-        .map_or(options.port, |address| address.port());
+        .map_err(|error| format!("cannot read the listening address: {error}"))?;
+    let port = addr.port();
+    // Agent commands find this board, and prove they may use it, through this file.
+    let info = runtime::ServerInfo::new(addr);
+    info.save(&workspace.state_dir)?;
 
     let mut url = format!("http://localhost:{port}/");
     if let Some(id) = &options.project {
@@ -109,6 +118,7 @@ fn serve(workspace: Workspace, options: &ServeOptions) -> Result<(), String> {
         Arc::clone(&workspace),
         Duration::from_secs_f64(options.interval),
     );
-    server::serve(listener, workspace, watcher);
+    let context = server::Context::new(workspace, watcher, info.token);
+    server::serve(listener, Arc::new(context));
     Ok(())
 }
