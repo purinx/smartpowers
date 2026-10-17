@@ -1,6 +1,6 @@
 # 04: validate_workflow.sh
 
-Status: Planned
+Status: Done
 Project: 20261018-001457-bash-scripts
 Requirements: REQ-003, REQ-004, NFR-003
 Depends on: 01
