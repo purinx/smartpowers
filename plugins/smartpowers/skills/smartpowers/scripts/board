@@ -1,17 +1,52 @@
 #!/bin/sh
 # Build (on first run and after plugin updates) and launch the Smartpowers progress board.
 # Windows: use board.cmd.
+#
+# Uses cargo from PATH or ~/.cargo/bin. If neither exists, installs a private
+# Rust toolchain with rustup into $SMARTPOWERS_RUST_HOME
+# (default: ~/.cache/smartpowers/rust) without touching the user's PATH,
+# shell profile, or ~/.cargo.
 set -eu
 
 skill_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 manifest="$skill_root/board/Cargo.toml"
 bin="$skill_root/board/target/release/smartpowers-board"
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "The Smartpowers board is built from source and needs the Rust toolchain." >&2
-  echo "Install Rust from https://rustup.rs, then run this command again." >&2
+fail() {
+  echo "$1" >&2
   exit 1
+}
+
+install_private_toolchain() {
+  rust_home=${SMARTPOWERS_RUST_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/smartpowers/rust}
+  RUSTUP_HOME="$rust_home/rustup"
+  CARGO_HOME="$rust_home/cargo"
+  export RUSTUP_HOME CARGO_HOME
+  PATH="$CARGO_HOME/bin:$PATH"
+  [ -x "$CARGO_HOME/bin/cargo" ] && return 0
+
+  command -v curl >/dev/null 2>&1 ||
+    fail "cargo is not installed and curl is unavailable to install it. Install Rust from https://rustup.rs."
+  echo "cargo not found; installing a private Rust toolchain into $rust_home (one time)..." >&2
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+    sh -s -- -y -q --no-modify-path --profile minimal --default-toolchain stable >&2 ||
+    fail "Rust toolchain installation failed. Install Rust from https://rustup.rs and try again."
+}
+
+if ! command -v cargo >/dev/null 2>&1; then
+  if [ -x "$HOME/.cargo/bin/cargo" ]; then
+    # rustup is installed but the shell profile hasn't added it to PATH.
+    PATH="$HOME/.cargo/bin:$PATH"
+  else
+    install_private_toolchain
+  fi
 fi
+
+# rustc links with the system C toolchain.
+command -v cc >/dev/null 2>&1 || case $(uname -s) in
+  Darwin) fail "No C linker found. Install the Xcode Command Line Tools with: xcode-select --install" ;;
+  *) fail "No C linker (cc) found. Install your distribution's build tools, e.g. build-essential or gcc." ;;
+esac
 
 if [ ! -x "$bin" ]; then
   echo "Building the Smartpowers board (first run only)..." >&2

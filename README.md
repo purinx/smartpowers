@@ -38,11 +38,11 @@ Both marketplaces expose the plugin as `smartpowers@smartpowers`.
 ## Progress board
 
 > [!NOTE]
-> The board is built from source on your machine, so it needs the [Rust toolchain](https://rustup.rs) (`cargo`). No prebuilt binaries are shipped. The rest of the Smartpowers workflow does not need Rust.
+> The board is built from source on your machine. No prebuilt binaries are shipped. If `cargo` is not installed, the launcher uses [rustup](https://rustup.rs) to install a private Rust toolchain into `~/.cache/smartpowers/rust` (Windows: `%LOCALAPPDATA%\smartpowers\rust`). This is a one-time download of about 450 MB, and it does not change your PATH, shell profile, or `~/.cargo`. To reclaim the space, delete that directory. The rest of the Smartpowers workflow does not need Rust.
 >
-> The board is tested on **macOS only**. It uses only the Rust standard library and should build on Linux and Windows, but neither has been verified yet.
+> Building needs a C linker: the Xcode Command Line Tools on macOS (`xcode-select --install`), or `build-essential`/`gcc` on Linux. Windows needs nothing extra.
 >
-> **Contributions welcome!** Reports or fixes from Linux and Windows users are especially appreciated, as is CI that builds and tests the board on all three platforms. See [Develop with Claude Code](#develop-with-claude-code) for local setup.
+> CI builds and tests the board on macOS, Linux, and Windows, including first launch without Rust. Day-to-day use has been verified on macOS. **Contributions welcome!** Reports or fixes from Linux and Windows users are especially appreciated. See [Develop with Claude Code](#develop-with-claude-code) for local setup.
 
 Ask the agent to "show the Smartpowers board", or run it yourself:
 
