@@ -1,0 +1,28 @@
+name: Release
+
+# Pushing a vX.Y.Z tag publishes a GitHub release whose notes are the
+# matching CHANGELOG.md section. The tag must equal the declared version.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check versions and extract release notes
+        run: scripts/release-notes.sh --tag "$GITHUB_REF_NAME" --output "$RUNNER_TEMP/notes.md"
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Smartpowers ${GITHUB_REF_NAME#v}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag

@@ -31,6 +31,8 @@ plugins/smartpowers/.claude-plugin/plugin.json    Claude Code plugin manifest
 plugins/smartpowers/skills/smartpowers/SKILL.md   shared workflow
 plugins/smartpowers/skills/smartpowers/assets/board/  progress board web UI
 plugins/smartpowers/skills/smartpowers/board/         progress board server (Rust source)
+CHANGELOG.md                                      release notes, one section per version
+scripts/release-notes.sh                          release tag check and notes extraction
 ```
 
 Both marketplaces expose the plugin as `smartpowers@smartpowers`.
@@ -183,3 +185,18 @@ python3 plugins/smartpowers/skills/smartpowers/scripts/validate_workflow.py \
   --project 20260908-183045-oauth-refresh \
   --phase implementation
 ```
+
+## Releasing
+
+Every release gets a `vX.Y.Z` tag and a GitHub release whose notes come from `CHANGELOG.md`.
+
+1. In one commit named `Release X.Y.Z`, bump the version in both plugin manifests and `plugins/smartpowers/skills/smartpowers/board/Cargo.toml` (then run `cargo build` to update `Cargo.lock`), and add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`. CI fails if the versions disagree or the current version has no changelog entry.
+2. Push it to `main`.
+3. Tag that commit and push the tag:
+
+   ```bash
+   git tag -a vX.Y.Z -m "Smartpowers X.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+The [Release workflow](.github/workflows/release.yml) checks that the tag matches every declared version, then publishes the GitHub release with that changelog section as its notes. Preview the notes locally with `scripts/release-notes.sh --tag vX.Y.Z`.

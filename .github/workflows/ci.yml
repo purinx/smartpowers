@@ -52,6 +52,10 @@ jobs:
       - name: Python tests
         run: python -m unittest discover -s tests -v
 
+      - name: Release notes exist for the current version
+        if: runner.os == 'Linux'
+        run: scripts/release-notes.sh --current > /dev/null
+
   bootstrap:
     # The launcher must install a private Rust toolchain when cargo is absent.
     name: Launcher without Rust (${{ matrix.os }})
