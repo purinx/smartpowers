@@ -200,3 +200,5 @@ Every release gets a `vX.Y.Z` tag and a GitHub release whose notes come from `CH
    ```
 
 The [Release workflow](.github/workflows/release.yml) checks that the tag matches every declared version, then publishes the GitHub release with that changelog section as its notes. Preview the notes locally with `scripts/release-notes.sh --tag vX.Y.Z`.
+
+`v0.7.0` is the one exception: it points at `d962bcb` (the commit that added the release workflow, right after `Release 0.7.0`) so the first automated release could run. Releases from 0.8.0 on tag the `Release X.Y.Z` commit itself.
