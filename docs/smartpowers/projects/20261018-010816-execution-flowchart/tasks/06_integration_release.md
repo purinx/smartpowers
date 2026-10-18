@@ -1,6 +1,6 @@
 # 06: 統合確認とリリース準備
 
-Status: Planned
+Status: In Progress
 Project: 20261018-010816-execution-flowchart
 Requirements: REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, REQ-012, REQ-013, NFR-003, NFR-004
 Depends on: 02, 03, 04, 05
@@ -28,6 +28,7 @@ DESIGN_DOC.md の Testing strategy(UI の確認)、Deployment and rollout
   - Added: Flow 表示、グラフの検査
 - プラグインのマニフェスト(`.claude-plugin`、`.codex-plugin`)のバージョンを 0.9.0 に上げる
 - リポジトリ全体の確認
+- 04 のレビューで見つかった問題の修正: 2 列以上をまたぐ矢印が途中の列のノードの下に潜り、別のノードにつながっているように見える。長い矢印を、ノードのない行の間を通る経路に変える(`js/views/flow.js`)。
 
 ### Excluded
 
@@ -36,6 +37,7 @@ DESIGN_DOC.md の Testing strategy(UI の確認)、Deployment and rollout
 ## Expected code areas
 
 - `CHANGELOG.md`
+- `plugins/smartpowers/skills/smartpowers/assets/board/js/views/flow.js`(矢印の経路の修正)
 - `plugins/smartpowers/.claude-plugin/plugin.json`
 - `plugins/smartpowers/.codex-plugin/plugin.json`
 - 必要なら、マーケットプレイスのマニフェストのバージョン
