@@ -392,13 +392,16 @@ function enablePanZoom(viewport, canvas, key, width, height, signature) {
   viewport.addEventListener('wheel', (event) => {
     if (!view) return;
     event.preventDefault();
+    // Deltas come in pixels, lines, or pages (deltaMode 0, 1, 2).
+    const unit = [1, 16, viewport.clientHeight][event.deltaMode] || 1;
+    const [dx, dy] = [event.deltaX * unit, event.deltaY * unit];
     if (!event.ctrlKey && !event.metaKey) {
-      store({ scale: view.scale, x: view.x - event.deltaX, y: view.y - event.deltaY });
+      store({ scale: view.scale, x: view.x - dx, y: view.y - dy });
       return;
     }
     const bounds = viewport.getBoundingClientRect();
     const [mx, my] = [event.clientX - bounds.left, event.clientY - bounds.top];
-    const scale = clamp(view.scale * Math.exp(-event.deltaY * 0.0015), ZOOM_SCALE);
+    const scale = clamp(view.scale * Math.exp(-dy * 0.0015), ZOOM_SCALE);
     const ratio = scale / view.scale;
     store({ scale, x: mx - (mx - view.x) * ratio, y: my - (my - view.y) * ratio });
   }, { passive: false });

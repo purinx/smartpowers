@@ -239,11 +239,17 @@ plan_rows() {
         if (col) { state = 1; print "table" }
         next
       }
-      if (match($0, /(^|[^A-Za-z0-9_])[0-9][0-9]_[a-z0-9_]+\.md/)) {
+      # The task is the first link destination naming a task file, so a
+      # file name in a link label is not taken for the task.
+      link = ""
+      if (match($0, /\]\(([^)]*\/)?[0-9][0-9]_[a-z0-9_]+\.md\)/)) {
+        link = substr($0, RSTART, RLENGTH)
+        sub(/^\]\(([^)]*\/)?/, "", link)
+      } else if (match($0, /(^|[^A-Za-z0-9_])[0-9][0-9]_[a-z0-9_]+\.md/)) {
         link = substr($0, RSTART, RLENGTH)
         sub(/^[^0-9]/, "", link)
-        print substr(link, 1, 2) "\t" $col
       }
+      if (link != "") print substr(link, 1, 2) "\t" $col
       next
     }
     state == 1 { state = 2 }

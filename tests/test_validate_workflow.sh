@@ -108,6 +108,13 @@ test_escaped_pipe_in_task_title_is_not_a_column() {
   assert_status 0
 }
 
+test_task_comes_from_link_destination_not_label() {
+  diamond_project
+  plan "| 01 | [Auth](01_auth.md) | None | REQ-001 |\n| 02 | [Update 01_auth.md](02_left.md) | 01 | REQ-001 |\n| 03 | [Right](./03_right.md) | 01 | REQ-001 |\n| 04 | [Join](04_join.md) | 02, 03 | NFR-001 |\n"
+  validate plan
+  assert_status 0
+}
+
 test_valid_plan() {
   valid_project
   validate implementation
