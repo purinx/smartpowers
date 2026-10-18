@@ -61,11 +61,32 @@ function arrowMarker(id, className) {
   }, [svgEl('path', { d: 'M0 0L10 5L0 10z' })]);
 }
 
+// Vertical center of row `row`, and of the gap just above it.
+const rowCenter = (row) => PADDING + row * (NODE_HEIGHT + ROW_GAP) + NODE_HEIGHT / 2;
+const gapAbove = (row) => PADDING + row * (NODE_HEIGHT + ROW_GAP) - ROW_GAP / 2;
+
+// The y of a horizontal lane that an edge skipping columns `skipped` (their
+// node counts) can follow without passing under a node: the source's own row
+// when those columns are empty there, or else the row gap, or the space below
+// the tallest skipped column, nearest to both ends.
+function laneY(fromRow, toRow, skipped) {
+  const tallest = Math.max(...skipped);
+  if (fromRow === toRow && fromRow >= tallest) return rowCenter(fromRow);
+  const target = (rowCenter(fromRow) + rowCenter(toRow)) / 2;
+  let best = gapAbove(1);
+  for (let row = 1; row <= tallest; row += 1) {
+    if (Math.abs(gapAbove(row) - target) < Math.abs(best - target)) best = gapAbove(row);
+  }
+  return best;
+}
+
 // Edges from the right middle of each dependency to the left middle of its
-// dependent. Dependencies that are not on the canvas get no edge.
-function edges(tasks, positions, width, height) {
+// dependent. Dependencies that are not on the canvas get no edge. Returns the
+// edge paths and the lowest y they reach.
+function edgePaths(tasks, positions, columns) {
   const byNumber = new Map(tasks.map((task) => [task.number, task]));
   const paths = [];
+  let bottom = 0;
   for (const task of tasks) {
     const to = positions.get(task.number);
     for (const number of new Set(task.dependsOn)) {
@@ -76,7 +97,19 @@ function edges(tasks, positions, width, height) {
       const y1 = from.y + NODE_HEIGHT / 2;
       const y2 = to.y + NODE_HEIGHT / 2;
       let d;
-      if (to.x > from.x) {
+      if (to.column > from.column + 1) {
+        // A straight curve would pass under the nodes of the skipped columns
+        // and look like it ends at one of them, so follow a free lane.
+        const skipped = columns.slice(from.column + 1, to.column).map((column) => column.length);
+        const lane = laneY(from.row, to.row, skipped);
+        const xa = x1 + COLUMN_GAP;
+        const xb = to.x - COLUMN_GAP;
+        const x2 = to.x - 1;
+        const bend = COLUMN_GAP / 2;
+        d = `M${x1} ${y1}C${x1 + bend} ${y1} ${xa - bend} ${lane} ${xa} ${lane}`
+          + `L${xb} ${lane}C${xb + bend} ${lane} ${x2 - bend} ${y2} ${x2} ${y2}`;
+        bottom = Math.max(bottom, lane);
+      } else if (to.x > from.x) {
         const x2 = to.x - 1;
         const bend = Math.max(24, (x2 - x1) / 2);
         d = `M${x1} ${y1}C${x1 + bend} ${y1} ${x2 - bend} ${y2} ${x2} ${y2}`;
@@ -94,6 +127,10 @@ function edges(tasks, positions, width, height) {
       }));
     }
   }
+  return { paths, bottom };
+}
+
+function edgeLayer(paths, width, height) {
   return svgEl('svg', {
     class: 'flow-edges', width: String(width), height: String(height), 'aria-hidden': 'true',
   }, [
@@ -163,6 +200,8 @@ export function renderFlow(tasks, issues) {
       const position = {
         x: PADDING + c * (NODE_WIDTH + COLUMN_GAP),
         y: PADDING + r * (NODE_HEIGHT + ROW_GAP),
+        column: c,
+        row: r,
       };
       positions.set(task.number, position);
       nodes.push(node(task, position)); // DOM order = column order, so Tab follows columns
@@ -171,10 +210,12 @@ export function renderFlow(tasks, issues) {
   const rows = Math.max(0, ...columns.map((column) => column.length));
   // A cycle may loop edges out past the last column, so leave room for them.
   const width = PADDING * 2 + columns.length * (NODE_WIDTH + COLUMN_GAP) - (columns.length && !issues.length ? COLUMN_GAP : 0);
-  const height = PADDING * 2 + rows * (NODE_HEIGHT + ROW_GAP) - (rows ? ROW_GAP : 0);
+  const { paths, bottom } = edgePaths(tasks, positions, columns);
+  // A lane below the tallest column needs room under the last row.
+  const height = Math.max(PADDING * 2 + rows * (NODE_HEIGHT + ROW_GAP) - (rows ? ROW_GAP : 0), bottom + PADDING);
 
   const canvas = el('div', { class: 'flow-canvas', style: `width:${width}px;height:${height}px` }, [
-    edges(tasks, positions, width, height),
+    edgeLayer(paths, width, height),
     ...nodes,
   ]);
   return el('div', { class: 'flow' }, [
