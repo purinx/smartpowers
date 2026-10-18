@@ -5,7 +5,7 @@ Smartpowers is a lightweight development-workflow plugin and marketplace for Cod
 1. requirements in the selected project's `PRD.md`;
 2. first-build design in its `DESIGN_DOC.md`;
 3. reviewed implementation tasks in its `tasks/` directory and optional task-manager synchronization;
-4. implementation in dependency order, with safe parallel work where supported.
+4. implementation driven by the task dependency graph, running independent tasks in parallel where supported.
 
 Each initiative gets an immutable, sortable ID such as `20260908-183045-oauth-refresh` and lives under `docs/smartpowers/projects/<project-id>/`. PRD, design, and task-plan transitions require explicit user approval. Stable `REQ-*` and `NFR-*` IDs keep requirements traceable within that project through design and delivery.
 
@@ -58,7 +58,7 @@ plugins\smartpowers\skills\smartpowers\scripts\board.cmd --root <repo-root>
 
 The board server is a single Rust program with the web UI embedded, using only the standard library (no third-party crates). The first launch compiles it with `cargo build --release` into `board/target/`, which takes a few seconds. Later launches reuse that build and recompile only after a plugin update changes the source. Run the board's tests with `cargo test --manifest-path plugins/smartpowers/skills/smartpowers/board/Cargo.toml`.
 
-It starts a local server on `127.0.0.1` and opens a Linear-style board in your browser. You get board and list views per project grouped by task status, the approval state of each phase, overall progress, dependency waits, and links to remote issues. The page updates live, so you can watch implementation progress as the agent works. Keyboard: `b` board, `l` list, `/` filter, `Esc` close. Options: `--project <id>`, `--port <n>`, `--no-open`.
+It starts a local server on `127.0.0.1` and opens a Linear-style board in your browser. You get board and list views per project grouped by task status, a Flow view that draws the task dependency graph as a flowchart with live status and Ready marks on tasks that can start, the approval state of each phase, overall progress, dependency waits, and links to remote issues. The page updates live, so you can watch implementation progress as the agent works. Add `?view=flow` to a board URL (for example `#/<project-id>?view=flow`) to share a link to the Flow view. Keyboard: `b` board, `l` list, `f` flow, `/` filter, `Esc` close. Options: `--project <id>`, `--port <n>`, `--no-open`.
 
 ### Steer the agent from the board
 
@@ -68,7 +68,6 @@ Each task's detail panel has an **Activity** section and a comment box:
 - **Comments:** type feedback and press <kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd>. While the agent implements tasks, it keeps `board inbox --wait` running in the background. Your comment ends that wait, so the agent sees it during its current work rather than at the end. The agent then adjusts course and answers with `board reply`, and the comment shows **Waiting for agent → Sent to agent → Addressed**.
 
 ```bash
-board next  --project <id> [--limit <n>]                          # tasks the lead agent can start now
 board inbox --project <id> [--task <nn>] [--wait] [--timeout <secs>]  # new comments, each delivered once
 board reply --project <id> --comment <id> [--resolve] <message>  # answer as the agent
 board log   --project <id> --task <nn> <message>                 # add a progress entry
@@ -76,7 +75,7 @@ board log   --project <id> --task <nn> <message>                 # add a progres
 
 ### Parallel tasks with subagents
 
-The lead agent starts the board, runs `board next`, and hands each listed task to its own subagent in its own git worktree. `board next` returns ready tasks from `tasks/PLAN.md` that share a parallel group. Each subagent connects to the board with `board inbox --task <nn> --wait`, streams progress with `board log`, and receives comments on its task the moment you post them. Cards of tasks with a connected agent show a live **Agent** badge. As subagents finish, the lead agent merges their branches, marks tasks Done, and dispatches the next ready group. While a board is running, these commands use its API, authenticated with a per-run token stored next to the comments. Without a board, they fall back to reading and writing those files directly.
+The lead agent starts the board and reads the task files to find ready tasks: `Planned` tasks whose dependencies are all Done, the same tasks the Flow view marks as Ready. It hands each ready task to its own subagent in its own git worktree. If a task's expected code areas overlap a task already in progress, the lead holds it and tells you the plan is missing a dependency. Each subagent connects to the board with `board inbox --task <nn> --wait`, streams progress with `board log`, and receives comments on its task the moment you post them. Cards of tasks with a connected agent show a live **Agent** badge. When its verification passes, each subagent pushes its branch and opens a pull request for its task, which you review and merge. After the merge, the lead marks the task Done and immediately dispatches any tasks that just became ready, without waiting for the other subagents. While a board is running, these commands use its API, authenticated with a per-run token stored next to the comments. Without a board, they fall back to reading and writing those files directly.
 
 Comments and logs live outside the repository, in `~/.local/state/smartpowers/<repo>-<hash>/` (Windows: `%LOCALAPPDATA%\smartpowers\state`; override with `SMARTPOWERS_STATE_HOME`). Agents treat comments as your instructions, so keeping them out of version control means a file someone commits can never pose as your feedback. The board writes nothing to the repository, and it accepts new comments only from its own page.
 

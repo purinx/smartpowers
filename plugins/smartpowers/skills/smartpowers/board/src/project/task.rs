@@ -57,7 +57,6 @@ pub struct Task {
     pub status_key: StatusKey,
     pub requirements: Vec<String>,
     pub depends_on: Vec<String>,
-    pub parallel_group: String,
     pub remote: Option<Remote>,
     pub updated: SystemTime,
     pub body: String,
@@ -89,7 +88,6 @@ impl Task {
             status,
             requirements: requirement_ids(header.field("requirements").unwrap_or("")),
             depends_on,
-            parallel_group: header.field("parallel group").unwrap_or("").to_string(),
             remote: parse_remote(&body),
             updated: mtime(path),
             body,
@@ -203,7 +201,6 @@ mod tests {
         assert_eq!(first.status_key, StatusKey::Done);
         assert_eq!(first.requirements, ["NFR-001", "REQ-002"]);
         assert!(first.depends_on.is_empty());
-        assert_eq!(first.parallel_group, "A");
         let remote = first.remote.as_ref().unwrap();
         assert_eq!(remote.key.as_deref(), Some("ENG-42"));
         assert_eq!(

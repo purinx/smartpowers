@@ -129,9 +129,10 @@ validate_design() { # require_approved
   fi
 }
 
-# task_files: sets $tasks to the numbered task files, one path per line.
+# task_files: sets $tasks to the numbered task files, one path per line, and
+# $numbers to their task numbers, space separated.
 task_files() {
-  local task_dir="$project_root/tasks" path name invalid="" numbers
+  local task_dir="$project_root/tasks" path name invalid=""
   [ -d "$task_dir" ] || fail "Missing required directory: $task_dir"
   tasks=""
   for path in "$task_dir"/*.md; do
@@ -145,10 +146,143 @@ task_files() {
   [ -n "$tasks" ] || fail "No numbered task files found in $task_dir"
   numbers=$(printf '%s' "$tasks" | sed 's|.*/\([0-9][0-9]\)_[^/]*$|\1|')
   [ "$(printf '%s\n' "$numbers" | sort | uniq -d)" = "" ] || fail "Task number prefixes must be unique"
+  numbers=$(printf '%s\n' "$numbers" | paste -sd ' ' -)
+}
+
+# task_refs <text>: the sorted unique two-digit task numbers in a dependency
+# list, space separated, like the board's task_refs: `01`, `Task 01`, and
+# links to `NN_name.md` files all count. `None`, `-`, and empty mean none.
+task_refs() {
+  case $(lower "$1") in
+    '' | none | -) return 0 ;;
+  esac
+  printf '%s\n' "$1" \
+    | LC_ALL=C sed -E 's/(^|[^A-Za-z0-9_])([0-9][0-9])_[A-Za-z0-9_]*\.md/\1\2/g' \
+    | LC_ALL=C tr -c 'A-Za-z0-9_' '\n' \
+    | { LC_ALL=C grep -Ex '[0-9]{2}' || true; } \
+    | LC_ALL=C sort -u | paste -sd ' ' -
+}
+
+# list_or_none <numbers>: `01, 02`, or `none` when empty.
+list_or_none() {
+  if [ -n "$1" ]; then
+    printf '%s' "$1" | sed 's/ /, /g'
+  else
+    printf none
+  fi
+}
+
+has_word() { # space-separated-list word
+  case " $1 " in
+    *" $2 "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# deps_of <number>: the task's dependencies from $graph (`NN:deps` lines).
+deps_of() {
+  printf '%s' "$graph" | sed -n "s/^$1://p"
+}
+
+# check_cycles: fails when the dependencies in $graph form a cycle. Tasks
+# whose dependencies are all removed are removed until none can be; then
+# tasks that nothing left depends on are trimmed so the cycle is reported.
+check_cycles() {
+  local left="$numbers" removed="" kept n d all progress=true
+  while $progress; do
+    progress=false
+    kept=""
+    for n in $left; do
+      all=true
+      for d in $(deps_of "$n"); do
+        has_word "$removed" "$d" || all=false
+      done
+      if $all; then
+        removed="$removed $n"
+        progress=true
+      else
+        kept="$kept $n"
+      fi
+    done
+    left=$kept
+  done
+  [ -n "$left" ] || return 0
+  progress=true
+  while $progress; do
+    progress=false
+    kept=""
+    for n in $left; do
+      all=false
+      for d in $left; do
+        if has_word "$(deps_of "$d")" "$n"; then all=true; fi
+      done
+      if $all; then kept="$kept $n"; else progress=true; fi
+    done
+    left=$kept
+  done
+  fail "Dependency cycle among tasks: $(list_or_none "${left# }")"
+}
+
+# plan_rows <plan text>: for the first table whose header row has a
+# `Depends on` column, prints `table`, then `NN<TAB>cell` for each row that
+# links a task file, where cell is the row's `Depends on` cell. Columns are
+# found by header name, so others such as `Parallel group` are ignored.
+plan_rows() {
+  printf '%s\n' "$1" | LC_ALL=C awk -F '|' '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    state == 2 { next }
+    /^[ \t]*\|/ {
+      # An escaped pipe (`\|`) is cell text, not a column delimiter.
+      gsub(/\\\|/, "\001")
+      if (state == 0) {
+        for (i = 1; i <= NF; i++) if (tolower(trim($i)) == "depends on") col = i
+        if (col) { state = 1; print "table" }
+        next
+      }
+      # The task is the first link destination naming a task file, so a
+      # file name in a link label is not taken for the task.
+      link = ""
+      if (match($0, /\]\(([^)]*\/)?[0-9][0-9]_[a-z0-9_]+\.md\)/)) {
+        link = substr($0, RSTART, RLENGTH)
+        sub(/^\]\(([^)]*\/)?/, "", link)
+      } else if (match($0, /(^|[^A-Za-z0-9_])[0-9][0-9]_[a-z0-9_]+\.md/)) {
+        link = substr($0, RSTART, RLENGTH)
+        sub(/^[^0-9]/, "", link)
+      }
+      if (link != "") print substr(link, 1, 2) "\t" $col
+      next
+    }
+    state == 1 { state = 2 }
+  '
+}
+
+# check_plan_table <plan path> <plan text>: the execution order table must
+# list every task, with the same dependencies as its task file.
+check_plan_table() {
+  local rows number cell listed="" expected actual
+  rows=$(plan_rows "$2")
+  [ "$(printf '%s\n' "$rows" | head -n 1)" = table ] \
+    || fail "No execution order table with a Depends on column in $1"
+  while IFS=$'\t' read -r number cell; do
+    [ "$number" != table ] || continue
+    has_word "$numbers" "$number" \
+      || fail "Execution order table in $1 lists task $number, which has no task file"
+    expected=$(deps_of "$number")
+    actual=$(task_refs "$(printf '%s' "$cell" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')")
+    [ "$expected" = "$actual" ] \
+      || fail "Task $number depends on $(list_or_none "$expected") in its task file but on $(list_or_none "$actual") in the execution order table in $1"
+    listed="$listed $number"
+  done <<EOF
+$rows
+EOF
+  for number in $numbers; do
+    has_word "$listed" "$number" || fail "Task $number is missing from the execution order table in $1"
+  done
 }
 
 validate_plan() { # require_approved
-  local plan_path="$project_root/tasks/PLAN.md" plan_text path text combined=""
+  local plan_path="$project_root/tasks/PLAN.md" plan_text path text combined="" number dep deps
+  graph=""
   plan_text=$(read_required "$plan_path")
   require_project "$plan_path" "$plan_text" "$project_id"
   if [ "$1" = true ]; then
@@ -165,9 +299,17 @@ validate_plan() { # require_approved
     require_any_status "$path" "$text"
     [ -n "$(ids "$text")" ] || fail "No requirement IDs found in $path"
     combined="$combined$text"$'\n'
+    number=$(basename -- "$path" | cut -c 1-2)
+    deps=$(task_refs "$(field "$text" 'Depends on')")
+    for dep in $deps; do
+      has_word "$numbers" "$dep" || fail "Task $number depends on missing task $dep in $path"
+    done
+    graph="$graph$number:$deps"$'\n'
   done <<EOF
 $tasks
 EOF
+  check_cycles
+  check_plan_table "$plan_path" "$plan_text"
   require_coverage "$project_root/PRD.md" "$requirements" "$project_root/tasks" "$combined"
 }
 

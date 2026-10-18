@@ -10,7 +10,8 @@ use crate::workspace::Workspace;
 pub const PROJECT_ID: &str = "20260908-183045-oauth-refresh";
 
 /// A throwaway repository with one project: task 01 is Done and linked to
-/// ENG-42, task 02 is In Progress and depends on 01. Its state directory
+/// ENG-42, task 02 is In Progress and depends on 01. Task 01 keeps a legacy
+/// `Parallel group:` line, which the board ignores. Its state directory
 /// lives inside the temp root. Everything is deleted on drop.
 pub struct TempRepo {
     pub root: PathBuf,

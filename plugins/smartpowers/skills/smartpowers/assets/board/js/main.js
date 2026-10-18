@@ -3,7 +3,7 @@
 // Module map:
 //   state.js       shared UI state and per-viewer preferences
 //   api.js         fetches projects from the board server
-//   router.js      #/<project>/<task> routes
+//   router.js      #/<project>/<task>?view=<view> routes
 //   live.js        Server-Sent Events subscription
 //   status.js      status columns and icons
 //   markdown.js    task body renderer
@@ -13,7 +13,7 @@
 import { loadState } from './api.js';
 import { byId } from './dom.js';
 import { connectLive } from './live.js';
-import { applyHash, closeTask } from './router.js';
+import { applyHash, closeTask, replaceViewInHash } from './router.js';
 import { rememberTaskSnapshots, setView, state } from './state.js';
 import { renderContent } from './views/content.js';
 import { renderHeader } from './views/header.js';
@@ -44,6 +44,7 @@ async function reload() {
 
 function switchView(view) {
   setView(view);
+  replaceViewInHash();
   render();
 }
 
@@ -73,6 +74,8 @@ function onKeyDown(event) {
     switchView('board');
   } else if (event.key === 'l') {
     switchView('list');
+  } else if (event.key === 'f') {
+    switchView('flow');
   }
 }
 

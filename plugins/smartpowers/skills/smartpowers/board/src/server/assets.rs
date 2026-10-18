@@ -38,6 +38,7 @@ const ASSETS: &[Asset] = &[
     asset!("/js/views/board.js", JS),
     asset!("/js/views/composer.js", JS),
     asset!("/js/views/content.js", JS),
+    asset!("/js/views/flow.js", JS),
     asset!("/js/views/header.js", JS),
     asset!("/js/views/list.js", JS),
     asset!("/js/views/panel.js", JS),

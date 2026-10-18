@@ -1,5 +1,4 @@
-//! Agent-facing commands: which tasks to start, new task comments, replies,
-//! and progress logs. Output is plain text written for a coding agent.
+//! Agent-facing commands: new task comments, replies, and progress logs. Output is plain text written for a coding agent.
 //!
 //! When a board is running for this repository, `inbox`, `reply`, and `log`
 //! go through its token-protected API, so comments arrive the moment the
@@ -9,10 +8,10 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::cli::{InboxOptions, LogOptions, NextOptions, ReplyOptions};
+use crate::cli::{InboxOptions, LogOptions, ReplyOptions};
 use crate::client::{Client, EventStream};
 use crate::project::comments::{self, Comment};
-use crate::project::{load_project, log, schedule, Project};
+use crate::project::{load_project, log, Project};
 use crate::workspace::Workspace;
 
 const POLL: Duration = Duration::from_millis(500);
@@ -31,45 +30,6 @@ pub fn comment_block(project: &Project, comment: &Comment) -> String {
         "--- Comment {} on task {} \"{title}\" ({}) ---\n{}\n",
         comment.id, comment.task, comment.created, comment.body
     )
-}
-
-/// `next`: the tasks the lead agent may hand to subagents now.
-pub fn next(workspace: &Workspace, options: &NextOptions) -> Result<(), String> {
-    let project = require_project(workspace, &options.project)?;
-    let schedule = schedule::next(&project, options.limit);
-    let id = &project.summary.id;
-    let line = |task: &crate::project::Task| {
-        let group = if task.parallel_group.is_empty() {
-            String::new()
-        } else {
-            format!(" (group {})", task.parallel_group)
-        };
-        format!(
-            "  {}  {}{group}  {}/tasks/{}\n",
-            task.number, task.title, project.path, task.file
-        )
-    };
-    let mut out = String::new();
-    if !schedule.running.is_empty() {
-        out.push_str("Running:\n");
-        schedule.running.iter().for_each(|t| out.push_str(&line(t)));
-        out.push('\n');
-    }
-    if schedule.start.is_empty() {
-        out.push_str(&format!(
-            "Nothing to start: {}\n",
-            schedule.reason.unwrap_or_default()
-        ));
-    } else {
-        out.push_str("Start now, one subagent per task, in this order:\n");
-        schedule.start.iter().for_each(|t| out.push_str(&line(t)));
-        out.push_str(&format!(
-            "\nSet each task's Status to In Progress before dispatching it, then run \
-             `board next --project {id}` again whenever a task finishes.\n"
-        ));
-    }
-    print!("{out}");
-    Ok(())
 }
 
 /// `inbox`: print comments no agent has seen yet and mark them delivered.

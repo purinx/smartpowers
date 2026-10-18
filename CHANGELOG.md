@@ -2,6 +2,24 @@
 
 All notable changes to Smartpowers are recorded here. Versions follow [Semantic Versioning](https://semver.org/). Each `## [x.y.z]` section becomes the GitHub release notes for tag `vx.y.z`; see [Releasing](README.md#releasing).
 
+## [0.9.0] - 2026-10-18
+
+### Added
+
+- Flow view on the board. Press `f` or choose **Flow** to see the plan's dependency graph: tasks flow left to right by dependency depth, placed near the tasks they connect to, with arrows for `Depends on`, a status-colored edge on each task, live status, the Agent badge, and a **Ready** chip on tasks whose dependencies are all Done. The graph opens fitted to the view and centered; scroll or drag the background to pan, zoom with Ctrl/Cmd + scroll or a pinch, and press **Fit** to see it all again. Hovering a task highlights its arrows. Click a node to open its details. `#/<project>/<task>?view=flow` links restore the view and the panel. The view works on draft plans, so the execution order can be reviewed before approval, and it shows a warning when a dependency is missing or tasks form a cycle.
+- The plan and implementation phases of `validate_workflow.sh` check the dependency graph: every dependency must exist, there must be no cycle, and the `Depends on` column of the execution order table in `tasks/PLAN.md` must match each task file.
+
+### Changed
+
+- The lead agent starts tasks as soon as they become ready. It lists `Planned` tasks whose dependencies are all `Done`, dispatches each to a subagent unless its files overlap a running task, and checks again every time a task finishes, without waiting for the other running tasks.
+- Each task finished by a subagent gets its own pull request. When its verification passes, the subagent pushes its task branch and opens the pull request with `gh pr create`; the user reviews and merges it there, without a separate Crit review. The task stays In Progress until the merge; the lead then updates the working branch, checks it, and marks the task Done. Task pull requests are stacked on the working branch, which the lead pushes first; pushing to the head branch of an open pull request needs no separate approval. Without `gh` or a remote, the lead verifies the branch and merges it locally. Subagents stop their comment listener when they finish.
+- Plans express what may run concurrently only through dependencies: tasks that would conflict when run together must depend on each other, and tasks with no dependency path may run at the same time.
+
+### Removed
+
+- `board next`. The lead agent picks ready tasks itself; the board's Flow view shows the same set.
+- Parallel groups. The planning guide no longer has a `Parallel group` column or field. Existing task files that still have one load and validate as before; the line is ignored.
+
 ## [0.8.0] - 2026-10-18
 
 ### Added
