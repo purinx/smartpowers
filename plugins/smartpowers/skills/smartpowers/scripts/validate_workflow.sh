@@ -232,6 +232,8 @@ plan_rows() {
     function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
     state == 2 { next }
     /^[ \t]*\|/ {
+      # An escaped pipe (`\|`) is cell text, not a column delimiter.
+      gsub(/\\\|/, "\001")
       if (state == 0) {
         for (i = 1; i <= NF; i++) if (tolower(trim($i)) == "depends on") col = i
         if (col) { state = 1; print "table" }

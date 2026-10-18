@@ -26,6 +26,7 @@ const PADDING = 24;
 const RELAX_ROUNDS = 12;
 const LANE_MARGIN = 8;
 const LANE_SPREAD = 6;
+const MAX_LANES = 32;
 const FIT_MARGIN = 32;
 const FIT_SCALE = [0.4, 1.5];
 const ZOOM_SCALE = [0.25, 2.5];
@@ -162,12 +163,23 @@ function laneThrough(numbers, top, desired, used) {
     const y = Math.min(high, Math.max(low, desired));
     if (!best || Math.abs(y - desired) < Math.abs(best.y - desired)) best = { y, low, high };
   }
-  // Spread edges that share a slot so they don't merge into one line.
+  // Spread edges that share a slot so they don't merge into one line: take
+  // the free lane nearest to the wanted y, alternating sides and skipping
+  // lanes outside the slot, so a slot boundary doesn't fold lanes together.
   const key = Math.round(best.low) + ':' + Math.round(best.high);
-  const count = used.get(key) || 0;
-  used.set(key, count + 1);
-  const offset = (count % 2 ? -1 : 1) * Math.ceil(count / 2) * LANE_SPREAD;
-  return Math.min(best.high, Math.max(best.low, best.y + offset));
+  if (!used.has(key)) used.set(key, []);
+  const lanes = used.get(key);
+  let y = best.y;
+  for (let k = 0; k < 2 * MAX_LANES; k += 1) {
+    const candidate = best.y + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * LANE_SPREAD;
+    if (candidate < best.low || candidate > best.high) continue;
+    if (lanes.every((taken) => Math.abs(taken - candidate) >= LANE_SPREAD)) {
+      y = candidate;
+      break;
+    }
+  }
+  lanes.push(y);
+  return y;
 }
 
 // A smooth path through points, leaving and entering each point horizontally.

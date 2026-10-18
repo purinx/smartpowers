@@ -100,6 +100,14 @@ test_ignores_parallel_group_column_and_field() {
   assert_status 0
 }
 
+test_escaped_pipe_in_task_title_is_not_a_column() {
+  diamond_project
+  plan "| 01 | [Auth \\\\| refresh](01_auth.md) | None | REQ-001 |\n| 02 | [Left](02_left.md) | 01 | REQ-001 |\n| 03 | [Right \\\\| side](03_right.md) | 01 | REQ-001 |\n| 04 | [Join](04_join.md) | 02, 03 | NFR-001 |\n"
+  grep -qF 'Auth \| refresh' "$(project)/tasks/PLAN.md" || fail "fixture lost its escaped pipe"
+  validate plan
+  assert_status 0
+}
+
 test_valid_plan() {
   valid_project
   validate implementation
