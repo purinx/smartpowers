@@ -9,8 +9,8 @@
 // connects to, so arrows run nearly straight. Nothing is random, so the same
 // tasks always give the same picture. Nodes are fixed-size HTML cards; one
 // inline <svg> beneath them draws the edges. The whole drawing sits in a
-// viewport that fits it to the available space, zooms with the wheel, and
-// pans by dragging the background.
+// viewport that fits it to the available space, pans with the wheel or by
+// dragging the background, and zooms with Ctrl/Cmd + wheel or a pinch.
 
 import { el } from '../dom.js';
 import { openTask } from '../router.js';
@@ -20,8 +20,8 @@ import { taskClasses } from './task-parts.js';
 
 const NODE_WIDTH = 232;
 const NODE_HEIGHT = 76;
-const COLUMN_GAP = 96;
-const NODE_GAP = 20;
+const COLUMN_GAP = 128;
+const NODE_GAP = 44;
 const PADDING = 24;
 const RELAX_ROUNDS = 12;
 const LANE_MARGIN = 8;
@@ -375,9 +375,15 @@ function enablePanZoom(viewport, canvas, key, width, height, signature) {
   if (view) applyView(viewport, canvas, view);
   else requestAnimationFrame(() => { if (viewport.isConnected) fit(); });
 
+  // Scrolling pans; Ctrl/Cmd + wheel (and trackpad pinch, which browsers
+  // report as a Ctrl + wheel) zooms around the cursor.
   viewport.addEventListener('wheel', (event) => {
     if (!view) return;
     event.preventDefault();
+    if (!event.ctrlKey && !event.metaKey) {
+      store({ scale: view.scale, x: view.x - event.deltaX, y: view.y - event.deltaY });
+      return;
+    }
     const bounds = viewport.getBoundingClientRect();
     const [mx, my] = [event.clientX - bounds.left, event.clientY - bounds.top];
     const scale = clamp(view.scale * Math.exp(-event.deltaY * 0.0015), ZOOM_SCALE);
