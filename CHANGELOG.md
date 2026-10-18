@@ -12,7 +12,7 @@ All notable changes to Smartpowers are recorded here. Versions follow [Semantic 
 ### Changed
 
 - The lead agent starts tasks as soon as they become ready. It lists `Planned` tasks whose dependencies are all `Done`, dispatches each to a subagent unless its files overlap a running task, and checks again every time a task finishes, without waiting for the other running tasks.
-- Each task finished by a subagent gets its own pull request. When its verification passes, the subagent pushes its task branch and opens the pull request with `gh pr create`; the user reviews and merges it there, without a separate Crit review. The task stays In Progress until the merge; the lead then updates the working branch, checks it, and marks the task Done. Without `gh` or a remote, the lead verifies the branch and merges it locally. Subagents stop their comment listener when they finish.
+- Each task finished by a subagent gets its own pull request. When its verification passes, the subagent pushes its task branch and opens the pull request with `gh pr create`; the user reviews and merges it there, without a separate Crit review. The task stays In Progress until the merge; the lead then updates the working branch, checks it, and marks the task Done. Task pull requests are stacked on the working branch, which the lead pushes first; pushing to the head branch of an open pull request needs no separate approval. Without `gh` or a remote, the lead verifies the branch and merges it locally. Subagents stop their comment listener when they finish.
 - Plans express what may run concurrently only through dependencies: tasks that would conflict when run together must depend on each other, and tasks with no dependency path may run at the same time.
 
 ### Removed
