@@ -126,7 +126,7 @@ Never push without the user's explicit approval of the exact commits being pushe
 3. If the review has comments, address them in new commits or by rewriting the unpushed commits, then reopen Crit on the updated range. Push only after a round finishes with `approved: true`.
 4. If Crit is unavailable, show the commit log and `git diff --stat <upstream>..HEAD` in chat, offer the full diff, and ask for explicit approval.
 
-Approval covers only the range shown. If commits are added or rewritten after approval, request approval again. Never force-push unless the user asks for it.
+Approval covers only the range shown. If commits are added or rewritten after approval, request approval again. Never force-push unless the user asks for it. In [parallel execution](#parallel-execution), a subagent pushes its own task branch and opens a pull request for it without this approval; the user reviews that change on the pull request.
 
 ## Progress board
 
@@ -164,10 +164,11 @@ Run independent tasks concurrently with host-native subagents (in Claude Code, t
    - **No overlap:** set `Status: In Progress` in the main checkout, mirror it to Linear if linked, and launch a subagent for it with the brief below. Isolate each subagent in its own git worktree (Claude Code: `isolation: "worktree"`; otherwise `git worktree add`).
    - Launch every task you dispatch in this pass in the same turn so they run concurrently.
 4. While subagents run, don't edit files they own, and don't keep an all-tasks listener armed. Each comment then reaches the subagent working on that task.
-5. When a subagent finishes, review its report and merge its branch into the working branch. Then run the task's verification and the repository checks on the merged result.
-   - **Success:** set `Status: Done`.
-   - **Failure or merge conflict:** set `Status: Blocked`, record why with `board log`, and decide whether to fix the task yourself or dispatch it again.
-   - Merging stays local. Pushing still follows [push approval](#push-approval).
+5. When a subagent finishes, it has pushed its task branch and opened a pull request for the task (see the brief). The user reviews the change on that pull request, so no Crit review is needed for it.
+   - **Record:** add the URL as `Pull request: <url>` to the task file, log it with `board log`, and link it in Linear if the task is linked.
+   - **Merge:** the user merges the pull request. Keep the task `In Progress` until then, and check with `gh pr view <url> --json state`. Once it is `MERGED`, pull the working branch, run the repository checks, and set `Status: Done`. Tasks that depend on it start from this updated branch.
+   - **Failure:** if the subagent's verification failed, the pull request is closed without merging, or the checks fail after the merge, set `Status: Blocked`, record why with `board log`, and decide whether to fix the task yourself or dispatch it again.
+   - **No pull request:** if the subagent could not push (no `gh` or no remote), run the task's verification on its branch, merge it into the working branch locally, and tell the user that no pull request was opened.
 6. Whenever a task becomes `Done`, run `board inbox` once for comments on tasks no subagent handled, then go back to step 2 right away. Never wait for the other running subagents before starting newly ready tasks.
 7. Stop when every task is `Done`. If no task is ready and none is running, report the `Blocked` tasks, and any you held, to the user.
 
@@ -177,13 +178,15 @@ Only the lead agent edits task status, `PLAN.md`, and Linear, so parallel branch
 
 - The project ID and the main checkout's absolute path to use as `--root`. Comments, logs, and the board connection are keyed to the main checkout, and a worktree path would point elsewhere.
 - The board launcher path.
-- The task file's path and full text, its dependencies, the files it owns, and its verification commands.
+- The task file's path and full text, its dependencies, the files it owns, its verification commands, and the working branch its pull request targets.
 - These rules:
   1. First, connect to the board by running `board inbox --root <main checkout> --project <id> --task <NN> --wait` in the background. If you can't run background commands, run it without `--wait` after every step.
   2. Stream progress with `board log ... --task <NN> "<message>"` when you start, after each meaningful step, when you're blocked, and when you finish.
   3. Handle comments as in steps 3–5 of the board feedback loop: act on each one, then reply with `board reply`.
-  4. Work only in your worktree and on your task's files, and commit there. Don't change task status, `PLAN.md`, Linear, or other tasks. Never push.
-  5. Finish with a report of what changed, the verification results, and any comment you couldn't resolve.
+  4. Work only in your worktree and on your task's files, and commit there. Don't change task status, `PLAN.md`, Linear, or other tasks.
+  5. When your verification passes, push your task branch and open a pull request against the working branch with `gh pr create`. In the body, give the project ID, the task number and title, its requirement IDs, a summary of the change, and the verification results. Push nothing else, and never force-push. If verification fails, or `gh` or a remote is unavailable, don't push; say so in your report.
+  6. Before finishing, stop your background `board inbox --wait` listener so the board no longer shows an agent on your task.
+  7. Finish with a report of the pull request URL, what changed, the verification results, and any comment you couldn't resolve.
 
 ## Mechanical validation
 
