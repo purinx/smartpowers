@@ -6,7 +6,7 @@ All notable changes to Smartpowers are recorded here. Versions follow [Semantic 
 
 ### Added
 
-- Flow view on the board. Press `f` or choose **Flow** to see the plan's dependency graph: tasks in columns by dependency depth, arrows for `Depends on`, live status, the Agent badge, and a **Ready** chip on tasks whose dependencies are all Done. Click a node to open its details. `#/<project>/<task>?view=flow` links restore the view and the panel. The view works on draft plans, so the execution order can be reviewed before approval, and it shows a warning when a dependency is missing or tasks form a cycle.
+- Flow view on the board. Press `f` or choose **Flow** to see the plan's dependency graph: tasks flow left to right by dependency depth, placed near the tasks they connect to, with arrows for `Depends on`, a status-colored edge on each task, live status, the Agent badge, and a **Ready** chip on tasks whose dependencies are all Done. The graph opens fitted to the view and centered; zoom with the wheel, drag the background to pan, and press **Fit** to see it all again. Hovering a task highlights its arrows. Click a node to open its details. `#/<project>/<task>?view=flow` links restore the view and the panel. The view works on draft plans, so the execution order can be reviewed before approval, and it shows a warning when a dependency is missing or tasks form a cycle.
 - The plan and implementation phases of `validate_workflow.sh` check the dependency graph: every dependency must exist, there must be no cycle, and the `Depends on` column of the execution order table in `tasks/PLAN.md` must match each task file.
 
 ### Changed

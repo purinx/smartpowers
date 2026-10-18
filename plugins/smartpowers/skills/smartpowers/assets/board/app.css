@@ -167,16 +167,26 @@ button, input, textarea { font: inherit; color: inherit; }
 .flow-issues { flex: none; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--progress) 45%, var(--border)); border-radius: var(--radius); background: var(--bg-elev); color: var(--text); }
 .flow-issues-title { display: flex; gap: 8px; align-items: center; font-weight: 600; color: var(--progress); }
 .flow-issues ul { margin: 4px 0 0; padding-left: 24px; color: var(--text-2); }
-.flow-scroll { flex: 1; min-height: 0; overflow: auto; background: var(--bg-side); border-radius: 10px; }
-.flow-canvas { position: relative; }
+.flow-viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 10px; background-color: var(--bg-side); background-image: radial-gradient(circle, var(--border-strong) 1px, transparent 1.2px); cursor: grab; touch-action: none; user-select: none; }
+.flow-viewport.panning { cursor: grabbing; }
+.flow-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.flow-fit { position: absolute; top: 10px; right: 10px; height: 28px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; box-shadow: var(--shadow); }
+.flow-fit:hover { background: var(--bg-hover); }
 .flow-edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
-.flow-edge { fill: none; stroke-width: 1.5; }
+.flow-edge { fill: none; stroke-width: 1.5; transition: opacity .15s, stroke-width .15s; }
+.flow-viewport.tracing .flow-edge { opacity: .2; }
+.flow-viewport.tracing .flow-edge.highlight { opacity: 1; stroke-width: 2.5; }
 .flow-edge.done { stroke: var(--text-3); }
 .flow-edge.pending { stroke: var(--accent-text); stroke-dasharray: 5 4; }
 .flow-arrow.done path { fill: var(--text-3); }
 .flow-arrow.pending path { fill: var(--accent-text); }
-.flow-node { position: absolute; width: 232px; height: 76px; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; overflow: hidden; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); cursor: pointer; transition: border-color .15s; }
+.flow-node { position: absolute; width: 232px; height: 76px; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px 8px 14px; overflow: hidden; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); cursor: pointer; transition: border-color .15s; }
 .flow-node:hover { border-color: var(--border-strong); }
+.flow-node::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 4px; background: var(--planned); }
+.flow-node.status-in_progress::before { background: var(--progress); }
+.flow-node.status-blocked::before { background: var(--blocked); }
+.flow-node.status-done::before { background: var(--done); }
+.flow-node.ready { border-color: color-mix(in srgb, var(--accent) 70%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow); }
 .flow-node.selected { border-color: var(--accent); }
 .flow-node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .flow-node-top { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; }
