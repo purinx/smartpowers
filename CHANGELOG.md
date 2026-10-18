@@ -2,6 +2,23 @@
 
 All notable changes to Smartpowers are recorded here. Versions follow [Semantic Versioning](https://semver.org/). Each `## [x.y.z]` section becomes the GitHub release notes for tag `vx.y.z`; see [Releasing](README.md#releasing).
 
+## [0.9.0] - 2026-10-18
+
+### Added
+
+- Flow view on the board. Press `f` or choose **Flow** to see the plan's dependency graph: tasks in columns by dependency depth, arrows for `Depends on`, live status, the Agent badge, and a **Ready** chip on tasks whose dependencies are all Done. Click a node to open its details. `#/<project>/<task>?view=flow` links restore the view and the panel. The view works on draft plans, so the execution order can be reviewed before approval, and it shows a warning when a dependency is missing or tasks form a cycle.
+- The plan and implementation phases of `validate_workflow.sh` check the dependency graph: every dependency must exist, there must be no cycle, and the `Depends on` column of the execution order table in `tasks/PLAN.md` must match each task file.
+
+### Changed
+
+- The lead agent starts tasks as soon as they become ready. It lists `Planned` tasks whose dependencies are all `Done`, dispatches each to a subagent unless its files overlap a running task, and checks again every time a task finishes, without waiting for the other running tasks.
+- Plans express what may run concurrently only through dependencies: tasks that would conflict when run together must depend on each other, and tasks with no dependency path may run at the same time.
+
+### Removed
+
+- `board next`. The lead agent picks ready tasks itself; the board's Flow view shows the same set.
+- Parallel groups. The planning guide no longer has a `Parallel group` column or field. Existing task files that still have one load and validate as before; the line is ignored.
+
 ## [0.8.0] - 2026-10-18
 
 ### Added
